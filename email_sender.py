@@ -2,6 +2,8 @@ import os
 import json
 import re
 import smtplib
+import threading
+import time
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
@@ -43,6 +45,12 @@ def is_valid_email(email: str) -> bool:
     return bool(re.match(regex, email.strip()))
 
 
+def trigger_welcome_email_async(email: str):
+    """ব্লক না করে ব্যাকগ্রাউন্ড থ্রেডে ওয়েলকাম ইমেইল পাঠানো"""
+    t = threading.Thread(target=send_welcome_email, args=(email,), daemon=True)
+    t.start()
+
+
 def add_subscriber(email: str, chat_id: int) -> tuple[bool, str]:
     """নতুন ইমেইল সাবস্ক্রাইবার যোগ করা"""
     email = email.strip().lower()
@@ -57,11 +65,13 @@ def add_subscriber(email: str, chat_id: int) -> tuple[bool, str]:
             s["email"] = email
             s["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
             save_subscribers(subs)
-            send_welcome_email(email)
+            trigger_welcome_email_async(email)
             return True, (
-                f"✅ **আপনার ইমেইল সফলভাবে আপডেট করা হয়েছে: {email}**\n\n"
-                "📬 **প্রমাণস্বরূপ আপনার জিমেইলে এইমাত্র একটি লাইভ টেস্ট বুলেটিন পাঠিয়ে দেওয়া হয়েছে!** এখনই আপনার ইনবক্স চেক করে দেখুন। 🌟\n\n"
-                "⏰ এরপর থেকে প্রতিদিন **সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়** ঢাকার লাইভ ট্রাফিক ও আবহাওয়া বুলেটিন সরাসরি আপনার ইনবক্সে পৌঁছে যাবে!"
+                f"✅ **আপনার ইমেইল সফলভাবে আপডেট করা হয়েছে:** `{email}`\n\n"
+                "📬 **প্রমাণস্বরূপ এইমাত্র একটি লাইভ টেস্ট বুলেটিন আপনার জিমেইলে পাঠানো হয়েছে!**\n\n"
+                "⚠️ **ইনবক্সে খুঁজে না পেলে:**\n"
+                "যেহেতু নতুন সার্ভিস থেকে প্রথমবার বার্তা পাঠানো হচ্ছে, তাই আপনার জিমেইল অ্যাপের বাঁদিকের মেনু (≡) থেকে **Spam (স্প্যাম)** অথবা **Promotions / Updates** ফোল্ডার চেক করুন। সেখানে পেলে দয়া করে **'Report not spam'** বা ইনবক্সে স্থানান্তর করুন—তাহলে পরবর্তী সব বুলেটিন সরাসরি মূল ইনবক্সে আসবে।\n\n"
+                "⏰ প্রতিদিন **সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়** স্বয়ংক্রিয়ভাবে বুলেটিন আপনার ইনবক্সে পৌঁছে যাবে!"
             )
 
     subs.append({
@@ -70,10 +80,12 @@ def add_subscriber(email: str, chat_id: int) -> tuple[bool, str]:
         "subscribed_at": datetime.now().strftime("%Y-%m-%d %H:%M")
     })
     save_subscribers(subs)
-    send_welcome_email(email)
+    trigger_welcome_email_async(email)
     return True, (
-        f"🎉 **অভিনন্দন! আপনার ইমেইল ({email}) সফলভাবে সাবস্ক্রাইব হয়েছে!**\n\n"
-        "📬 **প্রমাণস্বরূপ আপনার জিমেইলে এইমাত্র একটি লাইভ টেস্ট বুলেটিন পাঠিয়ে দেওয়া হয়েছে!** এখনই আপনার ইনবক্স চেক করে দেখুন। 🌟\n\n"
+        f"🎉 **অভিনন্দন! আপনার ইমেইল সফলভাবে যুক্ত হয়েছে:**\n`{email}`\n\n"
+        "📬 **প্রমাণস্বরূপ এইমাত্র একটি লাইভ টেস্ট বুলেটিন আপনার জিমেইলে পাঠানো হয়েছে!**\n\n"
+        "⚠️ **ইনবক্সে খুঁজে না পেলে করণীয়:**\n"
+        "যেহেতু এটি স্বয়ংক্রিয় বুলেটিন এবং আপনি প্রথমবার যুক্ত হলেন, তাই আপনার জিমেইল অ্যাপের বাঁদিকের মেনু (≡) থেকে **Spam (স্প্যাম)** অথবা **Promotions / Updates** ফোল্ডার চেক করুন। সেখানে পেলে দয়া করে **'Report not spam'** করে নিন, তাহলে পরবর্তী সব বুলেটিন সরাসরি ইনবক্সে আসবে।\n\n"
         "⏰ এরপর থেকে প্রতিদিন **সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়** ঢাকার সর্বশেষ ট্রাফিক ও আবহাওয়া বুলেটিন স্বয়ংক্রিয়ভাবে আপনার ইনবক্সে পৌঁছে যাবে!"
     )
 
@@ -316,9 +328,31 @@ def send_welcome_email(recipient_email: str) -> bool:
         weather_desc = "আপডেট হচ্ছে"
 
     msg = MIMEMultipart('alternative')
-    msg['Subject'] = "🎉 অভিনন্দন! ঢাকা ট্রাফিক ও আবহাওয়া বুলেটিন সক্রিয় হয়েছে [লাইভ স্যাম্পল]"
-    msg['From'] = GMAIL_ADDRESS
+    msg['Subject'] = "🌟 ঢাকা ট্রাফিক ও আবহাওয়া বুলেটিন সক্রিয় হয়েছে [লাইভ স্যাম্পল]"
+    msg['From'] = f"Dhaka Transport Guide <{GMAIL_ADDRESS}>"
     msg['To'] = recipient_email
+    msg['Reply-To'] = GMAIL_ADDRESS
+
+    plain_text = f"""ঢাকা ট্রাফিক ও আবহাওয়া বুলেটিন [লাইভ স্যাম্পল]
+───────────────────────────
+স্বাগতম! আপনার ইমেইল সফলভাবে ঢাকা ট্রান্সপোর্ট সার্ভিসে সাবস্ক্রাইব হয়েছে।
+
+🚗 বর্তমান ট্রাফিক অবস্থা: {jam.get('level', 'স্বাভাবিক')}
+• পরামর্শ: {jam.get('advice', '')}
+• রওয়ানা হওয়ার দিকনির্দেশনা: {depart}
+
+🌤️ আজকের আবহাওয়া:
+• তাপমাত্রা: {temp} (অনুভূত: {feels_like})
+• আর্দ্রতা: {humidity} | বৃষ্টির সম্ভাবনা: {rain_chance}
+• সতর্কবার্তা: {w_advice}
+
+⏰ প্রতিদিন সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায় এই বুলেটিন আপনার ইনবক্সে পৌঁছাবে।
+
+ধন্যবাদ,
+ঢাকা ট্রান্সপোর্ট এআই অ্যাসিস্ট্যান্ট প্ল্যাটফর্ম 🇧🇩
+প্রতিষ্ঠাতা ও ক্রিয়েটর: Md Sahadat Hossain
+টেলিগ্রাম বট লিংক: {TELEGRAM_BOT_URL}
+"""
 
     html_content = f"""<!DOCTYPE html>
 <html lang="bn">
@@ -460,19 +494,21 @@ def send_welcome_email(recipient_email: str) -> bool:
   </table>
 </body>
 </html>"""
+    msg.attach(MIMEText(plain_text, 'plain', 'utf-8'))
     msg.attach(MIMEText(html_content, 'html', 'utf-8'))
 
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            server.sendmail(GMAIL_ADDRESS, recipient_email, msg.as_bytes())
-        print(f"✅ স্বাগতম ও লাইভ স্যাম্পল ইমেইল পাঠানো হয়েছে to {recipient_email}")
-        return True
-    except Exception as e:
-        print(f"❌ স্বাগতম ইমেইল পাঠাতে সমস্যা: {e}")
-        return False
-        print(f"❌ স্বাগতম ইমেইল পাঠাতে সমস্যা: {e}")
-        return False
+    for attempt in range(2):
+        try:
+            with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=25) as server:
+                server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+                server.sendmail(GMAIL_ADDRESS, recipient_email, msg.as_bytes())
+            print(f"✅ স্বাগতম ও লাইভ স্যাম্পল ইমেইল পাঠানো হয়েছে to {recipient_email}")
+            return True
+        except Exception as e:
+            print(f"⚠️ স্বাগতম ইমেইল পাঠাতে চেষ্টা {attempt + 1} ব্যর্থ: {e}")
+            if attempt == 0:
+                time.sleep(2)
+    return False
 
 
 def send_alert_email() -> bool:

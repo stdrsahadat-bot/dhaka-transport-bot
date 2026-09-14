@@ -11,7 +11,7 @@ from config import TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID
 from jam_analyzer import get_jam_status
 from weather import get_dhaka_weather
 from ai_agent import get_ai_response, clear_history, load_knowledge_base, active_sessions
-from email_sender import add_subscriber, remove_subscriber, load_subscribers
+from email_sender import add_subscriber, remove_subscriber, load_subscribers, trigger_welcome_email_async
 
 
 import os
@@ -396,6 +396,44 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         elif ctx.user_data.get("awaiting_email"):
             await update.message.reply_text("⚠️ অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস লিখুন (যেমন: name@gmail.com) অথবা বাতিল করতে /start লিখুন।")
             return
+
+    # ২. ইউজার যদি জিমেইল/ইমেইল না পাওয়ার অভিযোগ বা প্রশ্ন করে (যেমন: "amar gmaile to kono massage ashe ni")
+    text_lower = text.lower()
+    email_indicators = ["gmail", "email", "mail", "ইমেইল", "জিমেইল", "মেইল"]
+    missing_indicators = [
+        "ashe ni", "asheni", "paini", "pay nai", "আসেনি", "পাইনি", "পাচ্ছি না",
+        "kothay", "কোথায়", "মেসেজ আসেনি", "massage ashe ni", "message ashe ni",
+        "massage paini", "message paini", "pawa jay ni", "paowa jay ni"
+    ]
+    
+    if any(ei in text_lower for ei in email_indicators) and any(mi in text_lower for mi in missing_indicators):
+        subs = load_subscribers()
+        user_email = None
+        for s in subs:
+            if s.get("chat_id") == user_id:
+                user_email = s.get("email")
+                break
+        
+        email_note = f"\n📧 আপনার সাবস্ক্রাইব করা ইমেইল: <code>{user_email}</code>\n" if user_email else ""
+        help_msg = (
+            "📬 <b>জিমেইল ইনবক্সে বুলেটিন দেখতে পাচ্ছেন না?</b>\n"
+            "───────────────────────────\n"
+            f"{email_note}\n"
+            "ঘাবড়ানোর কিছু নেই! আমাদের সিস্টেম থেকে আপনার ইমেইল সফলভাবে পাঠানো হয়েছে। ইনবক্সে সরাসরি না পাওয়ার কারণ ও সহজ সমাধান:\n\n"
+            "১. 📂 <b>Spam (স্প্যাম) ফোল্ডার চেক করুন:</b>\n"
+            "যেহেতু নতুন কোনো সার্ভিস থেকে প্রথমবারের মতো অটোমেটেড ইমেইল পাঠানো হয়েছে, তাই গুগল সিকিউরিটির জন্য অনেক সময় তা ইনবক্সে না দিয়ে <b>Spam (স্প্যাম)</b> অথবা <b>Promotions / Updates</b> ফোল্ডারে রেখে দেয়।\n\n"
+            "২. 📱 <b>মোবাইল জিমেইল অ্যাপে যেভাবে পাবেন:</b>\n"
+            "• জিমেইল অ্যাপের উপরে বাঁদিকের <b>তিনটি দাগ (≡ Menu)</b> এ ক্লিক করুন।\n"
+            "• নিচে নেমে <b>'Spam' (স্প্যাম)</b> অথবা <b>'All mail' (সকল মেইল)</b> ফোল্ডার ওপেন করুন।\n"
+            "• সেখানে <b>'ঢাকা ট্রাফিক ও আবহাওয়া বুলেটিন'</b> দেখতে পাবেন।\n\n"
+            "৩. ✅ <b>'Report Not Spam' এ ক্লিক করুন:</b>\n"
+            "ইমেইলটি ওপেন করে <b>'Report not spam'</b> বা <b>'Move to Inbox'</b> দিন। তাহলে এরপর থেকে প্রতিদিনের ৩টি বুলেটিন সরাসরি আপনার প্রাইমারি ইনবক্সে চলে আসবে!\n\n"
+            "💡 <i>আপনার সুবিধার জন্য আমরা এইমাত্র আপনার ঠিকানায় পুনরায় একটি লাইভ বুলেটিন পাঠিয়ে দিয়েছি! এখনই স্প্যাম ফোল্ডারটি চেক করে দেখুন।</i>"
+        )
+        if user_email:
+            trigger_welcome_email_async(user_email)
+        await update.message.reply_text(help_msg, parse_mode="HTML", reply_markup=get_active_buttons())
+        return
 
     await update.message.chat.send_action(action="typing")
     res = get_ai_response(user_id, text)
