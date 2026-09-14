@@ -10,6 +10,14 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 # .env ফাইল লোড করা (PC-তে চললে)
 load_dotenv()
 
+# ক্লাউড সার্ভারকে বাংলাদেশ সময় (BST / Asia/Dhaka) অনুযায়ী সেট করা
+os.environ["TZ"] = "Asia/Dhaka"
+if hasattr(time, "tzset"):
+    try:
+        time.tzset()
+    except Exception:
+        pass
+
 # উইন্ডোজ কনসোলে বাংলা ও ইমোজি সাপোর্ট নিশ্চিত করা
 try:
     if sys.stdout.encoding != 'utf-8':
