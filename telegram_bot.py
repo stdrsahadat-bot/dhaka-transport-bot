@@ -11,6 +11,7 @@ from config import TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID
 from jam_analyzer import get_jam_status
 from weather import get_dhaka_weather
 from ai_agent import get_ai_response, clear_history, load_knowledge_base, active_sessions
+from email_sender import add_subscriber, remove_subscriber, load_subscribers
 
 
 def get_start_button():
@@ -36,6 +37,35 @@ def get_active_buttons():
     return InlineKeyboardMarkup(keyboard)
 
 
+# ─────────────────────────── /subscribe ───────────────────────
+async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    args = ctx.args
+
+    if not args:
+        msg = (
+            "📧 **ঢাকা ট্রাফিক ও আবহাওয়া দৈনিক ইমেইল সার্ভিস**\n"
+            "───────────────────────────\n"
+            "প্রতিদিন **সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়** জিমেইলে ঢাকার রঙিন ট্রাফিক ও আবহাওয়া বুলেটিন পেতে লিখুন:\n\n"
+            "👉 `/subscribe আপনার_ইমেইল`\n\n"
+            "📌 *উদাহরণ:* `/subscribe rahim@gmail.com`\n\n"
+            "বট স্বয়ংক্রিয়ভাবে আপনার ইনবক্সে লাইভ অ্যালার্ট পাঠানো শুরু করবে!"
+        )
+        await update.message.reply_text(msg)
+        return
+
+    email = args[0].strip()
+    success, reply_msg = add_subscriber(email, user_id)
+    await update.message.reply_text(reply_msg)
+
+
+# ─────────────────────────── /unsubscribe ─────────────────────
+async def cmd_unsubscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    success, reply_msg = remove_subscriber(user_id)
+    await update.message.reply_text(reply_msg)
+
+
 # ─────────────────────────── /admin ───────────────────────────
 async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -52,15 +82,24 @@ async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     else:
         learned_preview = "• এখনো কোনো নতুন তথ্য জমা হয়নি।"
 
+    subscribers = load_subscribers()
+    sub_preview = ""
+    if subscribers:
+        sub_preview = "\n".join([f"  - {s['email']} ({s.get('subscribed_at', '')})" for s in subscribers[-5:]])
+    else:
+        sub_preview = "  - কোনো সাবস্ক্রাইবার এখনো নেই।"
+
     admin_text = (
         "👑 **অ্যাডমিন কন্ট্রোল সেন্টার | Dhaka Guide**\n"
         "───────────────────────────\n"
         f"• 👤 ক্রিয়েটর: **Md Sahadat Hossain**\n"
         f"• 🆔 টেলিগ্রাম আইডি: `{OWNER_TELEGRAM_ID}` (Verified ✅)\n"
+        f"• 📬 দৈনিক ইমেইল সাবস্ক্রাইবার: **{len(subscribers)}** জন\n"
         f"• 🧠 মানুষের থেকে শেখা তথ্য: **{len(knowledge)}** টি\n"
         f"• 👥 সক্রিয় ব্যবহারকারী সেশন: **{len(active_sessions)}** টি\n"
         "• 🧹 মেমোরি ক্লিনআপ: ৪৮ ঘণ্টা পর পর অটো-ক্লিন সক্রিয়\n"
         "• ☁️ ক্লাউড সার্ভার: Railway 24/7 Worker\n\n"
+        f"👥 **সাম্প্রতিক সাবস্ক্রাইবারগণ:**\n{sub_preview}\n\n"
         f"📚 **সাম্প্রতিক শেখা তথ্যের নমুনা:**\n{learned_preview}\n"
         "───────────────────────────\n"
         "বট পুরোপুরি নিরাপদ ও সুস্থভাবে চলছে! 🟢"
@@ -160,12 +199,16 @@ async def post_init(application: Application):
     # ১. সাধারণ পাবলিক ইউজারদের মেনু (এখানে অ্যাডমিন সম্পূর্ণ গোপন থাকবে)
     public_commands = [
         BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
+        BotCommand("subscribe", "জিমেইলে দৈনিক অ্যালার্ট সাবস্ক্রাইব"),
+        BotCommand("unsubscribe", "ইমেইল অ্যালার্ট বন্ধ করুন"),
     ]
     await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
 
     # ২. শুধুমাত্র আসল ক্রিয়েটর Sahadat vai-এর চ্যাটে সিক্রেট অ্যাডমিন শর্টকাট দেখাবে
     owner_commands = [
         BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
+        BotCommand("subscribe", "জিমেইলে দৈনিক অ্যালার্ট সাবস্ক্রাইব"),
+        BotCommand("unsubscribe", "ইমেইল অ্যালার্ট বন্ধ করুন"),
         BotCommand("admin", "👑 অ্যাডমিন কন্ট্রোল প্যানেল"),
     ]
     try:
@@ -195,6 +238,8 @@ def run_telegram_bot():
     )
 
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("subscribe", cmd_subscribe))
+    app.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
