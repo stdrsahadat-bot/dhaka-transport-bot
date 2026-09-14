@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta name="theme-color" content="#1565C0"/>
+  <title>ঢাকা ট্রান্সপোর্ট গাইড</title>
+  <link rel="manifest" href="manifest.json"/>
+  <style>
+    /* ──────────── রিসেট ──────────── */
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Arial,sans-serif;background:#EEF2F7;color:#263238;min-height:100vh}
+
+    /* ──────────── হেডার ──────────── */
+    header{background:linear-gradient(135deg,#1565C0,#0D47A1);color:#fff;
+           padding:18px 20px;display:flex;align-items:center;gap:12px;
+           position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,.25)}
+    header h1{font-size:20px;font-weight:700}
+    header span{font-size:28px}
+    .sub{font-size:12px;opacity:.8;margin-top:2px}
+
+    /* ──────────── নেভ ট্যাব ──────────── */
+    nav{display:flex;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.1);
+        overflow-x:auto;position:sticky;top:62px;z-index:99}
+    nav button{flex:1;min-width:80px;padding:12px 6px;border:none;background:none;
+               cursor:pointer;font-size:11px;color:#607D8B;display:flex;
+               flex-direction:column;align-items:center;gap:3px;transition:.2s;
+               border-bottom:3px solid transparent;white-space:nowrap}
+    nav button.active{color:#1565C0;border-bottom-color:#1565C0;font-weight:600}
+    nav button .ico{font-size:20px}
+
+    /* ──────────── পেজ ──────────── */
+    .page{display:none;padding:16px;max-width:700px;margin:auto}
+    .page.active{display:block}
+
+    /* ──────────── কার্ড ──────────── */
+    .card{background:#fff;border-radius:14px;padding:18px;margin-bottom:14px;
+          box-shadow:0 2px 8px rgba(0,0,0,.07)}
+    .card h2{font-size:16px;color:#1565C0;margin-bottom:12px;
+             display:flex;align-items:center;gap:8px}
+
+    /* ──────────── স্ট্যাটাস ব্যাজ ──────────── */
+    .badge{display:inline-block;padding:5px 14px;border-radius:20px;
+           font-size:13px;font-weight:600}
+    .badge.green{background:#E8F5E9;color:#2E7D32}
+    .badge.yellow{background:#FFF8E1;color:#F57F17}
+    .badge.red{background:#FFEBEE;color:#C62828}
+
+    /* ──────────── অ্যালার্ট বক্স ──────────── */
+    .alert{border-left:4px solid;border-radius:8px;padding:12px 14px;
+           font-size:14px;line-height:1.6;margin-top:10px}
+    .alert.info{background:#E3F2FD;border-color:#1565C0;color:#0D47A1}
+    .alert.warn{background:#FFF3E0;border-color:#FF9800;color:#E65100}
+    .alert.danger{background:#FFEBEE;border-color:#F44336;color:#B71C1C}
+    .alert.success{background:#E8F5E9;border-color:#4CAF50;color:#1B5E20}
+
+    /* ──────────── ইনপুট ──────────── */
+    input,select{width:100%;padding:12px 14px;border:2px solid #CFD8DC;
+                 border-radius:10px;font-size:15px;outline:none;
+                 transition:.2s;background:#FAFAFA}
+    input:focus,select:focus{border-color:#1565C0;background:#fff}
+    label{display:block;font-size:13px;color:#607D8B;margin-bottom:5px;font-weight:600}
+    .form-group{margin-bottom:12px}
+
+    /* ──────────── বাটন ──────────── */
+    .btn{width:100%;padding:14px;background:linear-gradient(135deg,#1565C0,#0D47A1);
+         color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:700;
+         cursor:pointer;margin-top:6px;transition:.2s;letter-spacing:.3px}
+    .btn:hover{opacity:.92;transform:translateY(-1px)}
+    .btn:active{transform:translateY(0)}
+
+    /* ──────────── রুট রেজাল্ট ──────────── */
+    #routeResult{display:none;margin-top:14px;animation:fadeIn .3s}
+    @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+    /* ──────────── বাস চিপ ──────────── */
+    .bus-chip{display:inline-block;background:#E3F2FD;color:#1565C0;
+              padding:6px 14px;border-radius:20px;font-size:14px;font-weight:700;
+              margin:4px 4px 4px 0}
+
+    /* ──────────── মেট্রো স্টেশন ──────────── */
+    .station{background:#E8F5E9;color:#1B5E20;padding:8px 14px;
+             border-radius:8px;margin:4px 0;font-size:14px}
+
+    /* ──────────── টিপস লিস্ট ──────────── */
+    .tip{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid #F5F5F5;
+         font-size:14px;line-height:1.6}
+    .tip:last-child{border-bottom:none}
+    .tip .ico{font-size:20px;flex-shrink:0}
+
+    /* ──────────── নম্বর গ্রিড ──────────── */
+    .num-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .num-card{background:#F5F5F5;border-radius:10px;padding:12px;text-align:center}
+    .num-card .num{font-size:22px;font-weight:700;color:#1565C0}
+    .num-card .lbl{font-size:12px;color:#607D8B;margin-top:3px}
+
+    /* ──────────── লাইভ ক্লক ──────────── */
+    #liveClock{font-size:13px;opacity:.85;margin-top:3px}
+
+    /* ──────────── স্ক্রোলবার ──────────── */
+    ::-webkit-scrollbar{height:4px;width:4px}
+    ::-webkit-scrollbar-thumb{background:#B0BEC5;border-radius:4px}
+  </style>
+</head>
+<body>
+
+<!-- ══════════ হেডার ══════════ -->
+<header>
+  <span>🚌</span>
+  <div>
+    <h1>ঢাকা ট্রান্সপোর্ট গাইড</h1>
+    <div class="sub" id="liveClock">লোড হচ্ছে…</div>
+  </div>
+</header>
+
+<!-- ══════════ নেভ ট্যাব ══════════ -->
+<nav>
+  <button class="active" onclick="show('home',this)"><span class="ico">🏠</span>হোম</button>
+  <button onclick="show('route',this)"><span class="ico">🗺️</span>রুট</button>
+  <button onclick="show('jam',this)"><span class="ico">🚗</span>জ্যাম</button>
+  <button onclick="show('metro',this)"><span class="ico">🚇</span>মেট্রো</button>
+  <button onclick="show('tips',this)"><span class="ico">💡</span>টিপস</button>
+  <button onclick="show('help',this)"><span class="ico">🆘</span>সাহায্য</button>
+</nav>
+
+<!-- ══════════ হোম পেজ ══════════ -->
+<div id="home" class="page active">
+
+  <!-- জ্যাম স্ট্যাটাস -->
+  <div class="card">
+    <h2>🚗 এখনকার জ্যাম অবস্থা</h2>
+    <p>অবস্থা: <span class="badge" id="jamBadge">যাচাই হচ্ছে…</span></p>
+    <p style="margin-top:8px;font-size:14px;color:#607D8B" id="jamAreas"></p>
+    <div class="alert info" id="jamAdvice" style="margin-top:10px">লোড হচ্ছে…</div>
+  </div>
+
+  <!-- বের হওয়ার পরামর্শ -->
+  <div class="card">
+    <h2>⏰ এখন বের হবেন?</h2>
+    <div class="alert" id="departAdvice">লোড হচ্ছে…</div>
+  </div>
+
+  <!-- আবহাওয়া -->
+  <div class="card">
+    <h2>🌡️ ঢাকার আবহাওয়া</h2>
+    <div id="weatherInfo">
+      <p style="color:#607D8B;font-size:14px">আবহাওয়া লোড হচ্ছে…</p>
+    </div>
+  </div>
+
+  <!-- দ্রুত লিংক -->
+  <div class="card">
+    <h2>⚡ দ্রুত অ্যাক্সেস</h2>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn" onclick="show('route',document.querySelectorAll('nav button')[1])" style="background:linear-gradient(135deg,#00897B,#00695C)">🗺️ রুট খুঁজুন</button>
+      <button class="btn" onclick="show('metro',document.querySelectorAll('nav button')[3])" style="background:linear-gradient(135deg,#7B1FA2,#4A148C)">🚇 মেট্রো তথ্য</button>
+      <button class="btn" onclick="show('tips',document.querySelectorAll('nav button')[4])" style="background:linear-gradient(135deg,#F57C00,#E65100)">💡 সিএনজি টিপস</button>
+      <button class="btn" onclick="show('help',document.querySelectorAll('nav button')[5])" style="background:linear-gradient(135deg,#C62828,#B71C1C)">🆘 জরুরি নম্বর</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ রুট ফাইন্ডার ══════════ -->
+<div id="route" class="page">
+  <div class="card">
+    <h2>🗺️ বাস রুট খুঁজুন</h2>
+    <div class="form-group">
+      <label>📍 কোথা থেকে যাবেন?</label>
+      <select id="origin">
+        <option value="">— এলাকা বেছে নিন —</option>
+        <option>মিরপুর</option>
+        <option>ধানমন্ডি</option>
+        <option>যাত্রাবাড়ী</option>
+        <option>মহাখালী</option>
+        <option>উত্তরা</option>
+        <option>গুলিস্তান</option>
+        <option>ফার্মগেট</option>
+        <option>মতিঝিল</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>🎯 কোথায় যাবেন?</label>
+      <select id="destination">
+        <option value="">— গন্তব্য বেছে নিন —</option>
+        <option>গুলিস্তান</option>
+        <option>মতিঝিল</option>
+        <option>ফার্মগেট</option>
+        <option>উত্তরা</option>
+        <option>সায়েদাবাদ</option>
+        <option>মিরপুর</option>
+        <option>ধানমন্ডি</option>
+      </select>
+    </div>
+    <button class="btn" onclick="findRoute()">🔍 রুট খুঁজুন</button>
+
+    <div id="routeResult">
+      <div class="card" style="background:#E3F2FD;border:2px solid #1565C0;margin-top:0">
+        <h2 style="color:#0D47A1">🚌 রুট পাওয়া গেছে!</h2>
+        <p style="margin-bottom:8px"><strong>🛣️ রুট:</strong> <span id="rRoute"></span></p>
+        <div style="margin:8px 0" id="rBuses"></div>
+        <p>💰 <strong>ভাড়া:</strong> <span id="rFare"></span></p>
+        <p>⏱️ <strong>সময়:</strong> <span id="rTime"></span></p>
+        <div class="alert info" id="rTips" style="margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- সিএনজি ভাড়া -->
+  <div class="card">
+    <h2>🛺 সিএনজি আনুমানিক ভাড়া</h2>
+    <div class="tip"><span class="ico">📍</span><div><strong>মিরপুর → গুলিস্তান:</strong> ১৫০-২০০ টাকা</div></div>
+    <div class="tip"><span class="ico">📍</span><div><strong>ধানমন্ডি → গুলিস্তান:</strong> ১২০-১৫০ টাকা</div></div>
+    <div class="tip"><span class="ico">📍</span><div><strong>উত্তরা → গুলিস্তান:</strong> ২৫০-৩৫০ টাকা</div></div>
+    <div class="tip"><span class="ico">📍</span><div><strong>ফার্মগেট → মতিঝিল:</strong> ১০০-১৩০ টাকা</div></div>
+    <div class="tip"><span class="ico">📍</span><div><strong>যাত্রাবাড়ী → মতিঝিল:</strong> ৮০-১২০ টাকা</div></div>
+  </div>
+</div>
+
+<!-- ══════════ জ্যাম গাইড ══════════ -->
+<div id="jam" class="page">
+  <div class="card">
+    <h2>🚗 পিক আওয়ার গাইড</h2>
+    <div class="tip"><span class="ico">🟢</span><div><strong>রাত ১২টা – ভোর ৭টা:</strong> রাস্তা একদম ফাঁকা। এখনই বের হওয়ার সেরা সময়।</div></div>
+    <div class="tip"><span class="ico">🔴</span><div><strong>সকাল ৭টা – ৯টা:</strong> ভারী জ্যাম। অফিস আওয়ার। মেট্রো নিন।</div></div>
+    <div class="tip"><span class="ico">🟡</span><div><strong>সকাল ১০টা – দুপুর ২টা:</strong> মাঝারি জ্যাম। তাড়া না থাকলে এখনই যান।</div></div>
+    <div class="tip"><span class="ico">🔴</span><div><strong>বিকেল ৩টা – রাত ৮টা:</strong> ভয়াবহ জ্যাম! যতটা সম্ভব এড়িয়ে চলুন।</div></div>
+    <div class="tip"><span class="ico">🟢</span><div><strong>রাত ৯টা – রাত ১২টা:</strong> জ্যাম কম। নিরাপদ হলে যেতে পারেন।</div></div>
+  </div>
+
+  <div class="card">
+    <h2>📍 সবচেয়ে বেশি জ্যাম কোথায়?</h2>
+    <div class="tip"><span class="ico">🔴</span><div><strong>মিরপুর রোড</strong> — সকাল ও বিকেল উভয় পিক আওয়ারে</div></div>
+    <div class="tip"><span class="ico">🔴</span><div><strong>ফার্মগেট</strong> — সারাদিনই মাঝারি থেকে ভারী জ্যাম</div></div>
+    <div class="tip"><span class="ico">🔴</span><div><strong>গুলিস্তান</strong> — দিনের বেশিরভাগ সময়</div></div>
+    <div class="tip"><span class="ico">🔴</span><div><strong>মতিঝিল</strong> — অফিস আওয়ারে ভয়াবহ</div></div>
+    <div class="tip"><span class="ico">🔴</span><div><strong>যাত্রাবাড়ী</strong> — বিকেলে অসহ্য জ্যাম</div></div>
+    <div class="tip"><span class="ico">🟡</span><div><strong>বনানী-গুলশান</strong> — সন্ধ্যায় ভারী জ্যাম</div></div>
+  </div>
+
+  <div class="card">
+    <h2>💡 জ্যাম এড়ানোর উপায়</h2>
+    <div class="tip"><span class="ico">🚇</span><div>মেট্রো রেল ব্যবহার করুন — সবচেয়ে দ্রুত ও নির্ভরযোগ্য।</div></div>
+    <div class="tip"><span class="ico">⏰</span><div>পিক আওয়ার এড়িয়ে বের হন।</div></div>
+    <div class="tip"><span class="ico">🛣️</span><div>বিকল্প রাস্তা ব্যবহার করুন — গুগল ম্যাপ চেক করুন।</div></div>
+    <div class="tip"><span class="ico">📱</span><div>উবার/পাঠাও বাইক নিন — জ্যামে ফাঁক দিয়ে যায়।</div></div>
+  </div>
+</div>
+
+<!-- ══════════ মেট্রো ══════════ -->
+<div id="metro" class="page">
+  <div class="card">
+    <h2>🚇 ঢাকা মেট্রো রেল</h2>
+    <div class="alert success">✅ বিকেলের জ্যামে মেট্রো সবচেয়ে ভালো! উত্তরা থেকে মতিঝিল মাত্র ৩৮ মিনিট।</div>
+  </div>
+
+  <div class="card">
+    <h2>📍 স্টেশন তালিকা (উত্তর → দক্ষিণ)</h2>
+    <div class="station">🔵 উত্তরা নর্থ</div>
+    <div class="station">🔵 উত্তরা সেন্টার</div>
+    <div class="station">🔵 উত্তরা সাউথ</div>
+    <div class="station">🔵 পল্লবী</div>
+    <div class="station">🔵 মিরপুর-১১</div>
+    <div class="station">🔵 মিরপুর-১০ ⭐</div>
+    <div class="station">🔵 কাজীপাড়া</div>
+    <div class="station">🔵 শেওড়াপাড়া</div>
+    <div class="station">🔵 আগারগাঁও</div>
+    <div class="station">🔵 বিজয় সরণি</div>
+    <div class="station">🔵 ফার্মগেট ⭐</div>
+    <div class="station">🔵 কারওয়ান বাজার</div>
+    <div class="station">🔵 শাহবাগ</div>
+    <div class="station">🔵 ঢাকা বিশ্ববিদ্যালয়</div>
+    <div class="station">🔵 বাংলাদেশ সচিবালয়</div>
+    <div class="station">🔵 মতিঝিল ⭐</div>
+    <div class="station">🔵 কমলাপুর</div>
+  </div>
+
+  <div class="card">
+    <h2>💰 ভাড়া ও সময়সূচী</h2>
+    <div class="tip"><span class="ico">💰</span><div><strong>ভাড়া:</strong> ২০–১০০ টাকা (দূরত্ব অনুযায়ী)</div></div>
+    <div class="tip"><span class="ico">🕐</span><div><strong>চলাচল:</strong> সকাল ৬:০০ – রাত ১০:০০</div></div>
+    <div class="tip"><span class="ico">🔄</span><div><strong>বিরতি:</strong> প্রতি ৭-১০ মিনিটে একটি ট্রেন</div></div>
+    <div class="tip"><span class="ico">📞</span><div><strong>হেল্পলাইন:</strong> 16785</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🚢 লঞ্চ তথ্য — সদরঘাট</h2>
+    <div class="tip"><span class="ico">🚢</span><div><strong>বরিশাল:</strong> সন্ধ্যা ৬-৮টা | ডেক ২০০ টাকা, কেবিন ৮০০+</div></div>
+    <div class="tip"><span class="ico">🚢</span><div><strong>চাঁদপুর:</strong> সকাল ও বিকেল | ১০০-১৫০ টাকা</div></div>
+    <div class="tip"><span class="ico">🚢</span><div><strong>ভোলা:</strong> সন্ধ্যা ৭টা | ডেক ২৫০ টাকা</div></div>
+    <div class="tip"><span class="ico">💡</span><div>গুলিস্তান থেকে সদরঘাট: রিকশায় ১০-২০ মিনিট।</div></div>
+  </div>
+</div>
+
+<!-- ══════════ টিপস ══════════ -->
+<div id="tips" class="page">
+  <div class="card">
+    <h2>🛺 সিএনজি টিপস — ঠকবেন না!</h2>
+    <div class="tip"><span class="ico">✅</span><div>মিটারে যেতে বলুন — চুক্তিতে সবসময় বেশি নেয়।</div></div>
+    <div class="tip"><span class="ico">✅</span><div>পাঠাও CNG-তে ফিক্সড ভাড়া — ঠকার সুযোগ নেই।</div></div>
+    <div class="tip"><span class="ico">✅</span><div>উঠার আগে গন্তব্য ও ভাড়া নিশ্চিত করুন।</div></div>
+    <div class="tip"><span class="ico">⚠️</span><div>রাতে একা সিএনজিতে উঠবেন না।</div></div>
+    <div class="tip"><span class="ico">💡</span><div>বেশি চাইলে না বলুন — অন্যটা পাবেন।</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🚌 বাসে চলার টিপস</h2>
+    <div class="tip"><span class="ico">✅</span><div>বাস থামলে সামনে উঠুন, পেছনে নামুন — এটাই নিয়ম।</div></div>
+    <div class="tip"><span class="ico">✅</span><div>হেল্পারকে গন্তব্য বলুন — সে ভাড়া নেবে।</div></div>
+    <div class="tip"><span class="ico">✅</span><div>ভাড়া ঠিকমতো দিন — কম দেওয়ার চেষ্টা করবেন না।</div></div>
+    <div class="tip"><span class="ico">⚠️</span><div>ভিড়ে পকেট সামলান — পকেটমার সতর্ক থাকুন।</div></div>
+    <div class="tip"><span class="ico">💡</span><div>মহিলা সিট সামনে — ভুলেও বসবেন না।</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🌡️ গরমে বের হওয়ার টিপস</h2>
+    <div class="tip"><span class="ico">⏰</span><div>সকাল ৮টার আগে বা সন্ধ্যা ৬টার পরে বের হন।</div></div>
+    <div class="tip"><span class="ico">💧</span><div>সবসময় পানির বোতল সাথে রাখুন।</div></div>
+    <div class="tip"><span class="ico">☂️</span><div>ছাতা রাখুন — রোদ ও বৃষ্টি দুটোর জন্যই।</div></div>
+    <div class="tip"><span class="ico">🚇</span><div>AC বাস বা মেট্রো ব্যবহার করুন।</div></div>
+    <div class="tip"><span class="ico">🏪</span><div>গরম বেশি হলে শপিং মল বা হাসপাতালের লবিতে বিশ্রাম নিন।</div></div>
+  </div>
+
+  <div class="card">
+    <h2>📱 দরকারী অ্যাপ</h2>
+    <div class="tip"><span class="ico">🟢</span><div><strong>উবার</strong> — নির্ভরযোগ্য, ফিক্সড ভাড়া</div></div>
+    <div class="tip"><span class="ico">🟢</span><div><strong>পাঠাও</strong> — বাইক + CNG, সস্তা</div></div>
+    <div class="tip"><span class="ico">🟢</span><div><strong>Shohoz</strong> — বাস টিকিট অনলাইনে</div></div>
+    <div class="tip"><span class="ico">🟢</span><div><strong>Google Maps</strong> — রাস্তা ও ট্রাফিক দেখুন</div></div>
+  </div>
+</div>
+
+<!-- ══════════ সাহায্য ══════════ -->
+<div id="help" class="page">
+  <div class="card">
+    <h2>🆘 জরুরি নম্বর</h2>
+    <div class="num-grid">
+      <div class="num-card"><div class="num">999</div><div class="lbl">🚔 পুলিশ</div></div>
+      <div class="num-card"><div class="num">199</div><div class="lbl">🚑 অ্যাম্বুলেন্স</div></div>
+      <div class="num-card"><div class="num">199</div><div class="lbl">🔥 ফায়ার সার্ভিস</div></div>
+      <div class="num-card"><div class="num">16785</div><div class="lbl">🚇 মেট্রো রেল</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🗺️ রাস্তায় হারিয়ে গেলে</h2>
+    <div class="tip"><span class="ico">1️⃣</span><div>কাছের বড় মসজিদ, স্কুল বা হাসপাতালের নাম জিজ্ঞেস করুন।</div></div>
+    <div class="tip"><span class="ico">2️⃣</span><div>Google Maps খুলুন — "আমার অবস্থান" দেখুন।</div></div>
+    <div class="tip"><span class="ico">3️⃣</span><div>দোকানদারকে জিজ্ঞেস করুন — বেশিরভাগই সাহায্য করে।</div></div>
+    <div class="tip"><span class="ico">4️⃣</span><div>পুলিশ দেখলে সাহায্য চান — 999-এ কল করুন।</div></div>
+    <div class="tip"><span class="ico">5️⃣</span><div>উবার/পাঠাও বুক করুন — ড্রাইভার পথ চেনে।</div></div>
+  </div>
+
+  <div class="card">
+    <h2>🏥 ঢাকার প্রধান হাসপাতাল</h2>
+    <div class="tip"><span class="ico">🏥</span><div><strong>ঢাকা মেডিকেল কলেজ:</strong> বকশীবাজার | ☎ 02-55165088</div></div>
+    <div class="tip"><span class="ico">🏥</span><div><strong>স্যার সলিমুল্লাহ মেডিকেল:</strong> মিটফোর্ড</div></div>
+    <div class="tip"><span class="ico">🏥</span><div><strong>শহীদ সোহরাওয়ার্দী:</strong> শেরেবাংলা নগর</div></div>
+    <div class="tip"><span class="ico">🏥</span><div><strong>বঙ্গবন্ধু শেখ মুজিব মেডিকেল:</strong> শাহবাগ</div></div>
+  </div>
+</div>
+
+<!-- ══════════ JavaScript ══════════ -->
+<script>
+// ── বাস রুট ডেটা ──
+const ROUTES = {
+  "মিরপুর": {
+    "গুলিস্তান": { buses:["৮","১৪","৪৮","বিহঙ্গ"], fare:"২৫-৩৫ টাকা", time:"৪৫-৯০ মিনিট", tips:"মিরপুর-১০ গোলচত্বর থেকে উঠুন।" },
+    "মতিঝিল":  { buses:["৮","২৩","৪৮"],            fare:"৩০-৪০ টাকা", time:"৬০-১২০ মিনিট", tips:"মেট্রোতে ফার্মগেট নেমে রিকশায় মতিঝিল।" },
+    "ফার্মগেট": { buses:["৮","১৪"],                  fare:"১৫-২০ টাকা", time:"২০-৪৫ মিনিট", tips:"মেট্রোতে মাত্র ১০ মিনিট!" },
+    "উত্তরা":   { buses:["বিআরটিসি"],               fare:"৪০-৬০ টাকা", time:"৪৫-৯০ মিনিট", tips:"মেট্রোতে মাত্র ১৫ মিনিট।" },
+    "সায়েদাবাদ":{ buses:["৮","বিহঙ্গ"],             fare:"৪০-৫০ টাকা", time:"৭৫-১৫০ মিনিট", tips:"বিকেলে এড়িয়ে চলুন।" },
+  },
+  "ধানমন্ডি": {
+    "মতিঝিল":  { buses:["২৭","৫৬"],                 fare:"২০-৩০ টাকা", time:"৩০-৬০ মিনিট", tips:"সায়েন্স ল্যাব মোড় থেকে উঠুন।" },
+    "গুলিস্তান":{ buses:["বিআরটিসি","৫৬"],           fare:"২০-২৫ টাকা", time:"৩০-৫৫ মিনিট", tips:"শাহবাগ মোড় থেকেও উঠতে পারবেন।" },
+    "উত্তরা":   { buses:["বিআরটিসি AC"],              fare:"৬০-৮০ টাকা", time:"৬০-১২০ মিনিট", tips:"AC বাসে আরামদায়ক।" },
+  },
+  "যাত্রাবাড়ী": {
+    "গুলিস্তান":{ buses:["মিনিবাস","সিটি বাস"],       fare:"১৫-২০ টাকা", time:"২০-৬০ মিনিট", tips:"যাত্রাবাড়ী মোড় থেকে উঠুন।" },
+    "মতিঝিল":  { buses:["স্থানীয় বাস"],              fare:"১৫-২৫ টাকা", time:"২৫-৬০ মিনিট", tips:"সকালে জ্যাম কম।" },
+  },
+  "মহাখালী": {
+    "গুলিস্তান":{ buses:["শিকড়","বিহঙ্গ","পূরবী"],   fare:"২০-৩০ টাকা", time:"৩০-৭৫ মিনিট", tips:"মহাখালী বাস টার্মিনাল থেকে উঠুন।" },
+    "মিরপুর":  { buses:["শিকড়","বিহঙ্গ"],            fare:"২৫-৩৫ টাকা", time:"৪০-৮০ মিনিট", tips:"" },
+  },
+  "উত্তরা": {
+    "গুলিস্তান":{ buses:["বিআরটিসি","AC বাস"],        fare:"৫০-৭০ টাকা", time:"৬০-১৩০ মিনিট", tips:"মেট্রোতে মতিঝিল মাত্র ৩৮ মিনিট!" },
+    "মিরপুর":  { buses:["বিআরটিসি"],                 fare:"৪০-৬০ টাকা", time:"৪৫-৯০ মিনিট", tips:"মেট্রোতে ১৫ মিনিট।" },
+  },
+  "গুলিস্তান": {
+    "সায়েদাবাদ":{ buses:["মিনিবাস"],                fare:"১০-১৫ টাকা", time:"১৫-৪০ মিনিট", tips:"ঘন ঘন বাস পাবেন।" },
+    "মিরপুর":  { buses:["৮","১৪","৪৮"],              fare:"২৫-৩৫ টাকা", time:"৪৫-৯০ মিনিট", tips:"" },
+  },
+};
+
+// ── জ্যাম ক্যালকুলেশন ──
+function getJam() {
+  const h = new Date().getHours();
+  const d = new Date().getDay(); // 0=রবি,5=শুক্র,6=শনি
+  if (d === 5) {
+    if (h >= 9 && h < 13) return { level:"মাঝারি", cls:"yellow", areas:"গুলিস্তান, সদরঘাট", advice:"জুমার সময়। একটু পরে বের হন।" };
+    return { level:"কম", cls:"green", areas:"কোনো বিশেষ এলাকা নেই", advice:"আজ শুক্রবার — রাস্তা মোটামুটি ফাঁকা।" };
+  }
+  if (d === 6) return { level:"কম", cls:"green", areas:"কোনো বিশেষ এলাকা নেই", advice:"আজ শনিবার — ছুটির দিন। রাস্তা ফাঁকা।" };
+  if (h < 7)  return { level:"নেই বললেই চলে", cls:"green", areas:"কোনো সমস্যা নেই", advice:"ভোরবেলা — রাস্তা একদম ফাঁকা! এখনই বের হন।" };
+  if (h < 10) return { level:"ভারী 🔴", cls:"red", areas:"মিরপুর রোড, ফার্মগেট, মহাখালী, যাত্রাবাড়ী", advice:"অফিস আওয়ার জ্যাম! সম্ভব হলে মেট্রোতে যান।" };
+  if (h < 15) return { level:"মাঝারি", cls:"yellow", areas:"গুলিস্তান, পল্টন, মতিঝিল", advice:"মাঝারি জ্যাম। তাড়া না থাকলে একটু পরে যান।" };
+  if (h < 21) return { level:"ভয়াবহ 🔴", cls:"red", areas:"শাহবাগ, ফার্মগেট, বনানী, মতিঝিল, সায়েদাবাড়ী", advice:"বিকেল-সন্ধ্যার পিক আওয়ার! রাত ৮টার পর বের হন।" };
+  return { level:"কম", cls:"green", areas:"কোনো বিশেষ এলাকা নেই", advice:"রাতে রাস্তা ফাঁকা। নিরাপদে যেতে পারবেন।" };
+}
+
+function getDepartAdvice() {
+  const h = new Date().getHours();
+  if (h < 7)  return { text:"✅ এখনই বের হন — রাস্তা একদম ফাঁকা!", cls:"success" };
+  if (h < 8)  return { text:"⚠️ জ্যাম শুরু হচ্ছে — দ্রুত বের হন!", cls:"warn" };
+  if (h < 10) return { text:"🔴 এখন ভারী জ্যাম। ৩০-৪৫ মিনিট অপেক্ষা করুন বা মেট্রো নিন।", cls:"danger" };
+  if (h < 15) return { text:"✅ এখন বের হতে পারেন — জ্যাম কম।", cls:"success" };
+  if (h < 16) return { text:"⚠️ বিকেলের জ্যাম শুরু হচ্ছে — এখনই বের হন!", cls:"warn" };
+  if (h < 21) return { text:"🔴 ভয়াবহ জ্যাম! রাত ৮টার পরে বের হওয়াই ভালো।", cls:"danger" };
+  return { text:"✅ এখন রাস্তা ফাঁকা — নিরাপদে যেতে পারবেন।", cls:"success" };
+}
+
+// ── আবহাওয়া (OpenWeatherMap) ──
+const OWM_KEY = "c9fd9d4bdad3bedf2b1fac5648309a4b";
+async function loadWeather() {
+  try {
+    const r = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=Dhaka,BD&appid=${OWM_KEY}&units=metric`);
+    const d = await r.json();
+    if (d.cod !== 200) throw new Error("API error");
+    const temp   = Math.round(d.main.temp);
+    const feels  = Math.round(d.main.feels_like);
+    const hum    = d.main.humidity;
+    const desc   = d.weather[0].description;
+    let tip = temp >= 38 ? "🔥 অসহ্য গরম! সকাল ৮টার আগে বা সন্ধ্যার পর বের হন।"
+            : temp >= 34 ? "☀️ বেশ গরম। পানি ও ছাতা সাথে নিন।"
+            : hum >= 85  ? "🌧️ আর্দ্রতা বেশি, অস্বস্তিকর। ছাতা রাখুন।"
+            : "✅ আবহাওয়া মোটামুটি ভালো।";
+    document.getElementById('weatherInfo').innerHTML = `
+      <p>🌡️ তাপমাত্রা: <b>${temp}°C</b> (অনুভব ${feels}°C)</p>
+      <p>💧 আর্দ্রতা: ${hum}%</p>
+      <p>🌤️ ${desc}</p>
+      <div class="alert ${temp>=38?'danger':hum>=85?'warn':'success'}" style="margin-top:8px">${tip}</div>`;
+  } catch(e) {
+    document.getElementById('weatherInfo').innerHTML = '<p style="color:#607D8B;font-size:14px">⚠️ আবহাওয়া তথ্য পাওয়া যাচ্ছে না — API Key সক্রিয় হতে ২ ঘণ্টা লাগতে পারে।</p>';
+  }
+}
+
+// ── ইউআই আপডেট ──
+function updateUI() {
+  const jam = getJam();
+  const dep = getDepartAdvice();
+
+  const badge = document.getElementById('jamBadge');
+  badge.textContent = jam.level;
+  badge.className = `badge ${jam.cls}`;
+
+  document.getElementById('jamAreas').textContent = `📍 ${jam.areas}`;
+  document.getElementById('jamAdvice').textContent = `💡 ${jam.advice}`;
+  document.getElementById('jamAdvice').className   = `alert ${jam.cls === 'red' ? 'danger' : jam.cls === 'yellow' ? 'warn' : 'success'}`;
+
+  document.getElementById('departAdvice').textContent = dep.text;
+  document.getElementById('departAdvice').className   = `alert ${dep.cls}`;
+}
+
+// ── লাইভ ঘড়ি ──
+function updateClock() {
+  const now = new Date();
+  const days = ["রবিবার","সোমবার","মঙ্গলবার","বুধবার","বৃহস্পতিবার","শুক্রবার","শনিবার"];
+  document.getElementById('liveClock').textContent =
+    `${days[now.getDay()]} | ${now.toLocaleTimeString('bn-BD')}`;
+}
+
+// ── রুট ফাইন্ডার ──
+function findRoute() {
+  const o = document.getElementById('origin').value;
+  const d = document.getElementById('destination').value;
+  if (!o || !d) { alert('উৎস ও গন্তব্য দুটোই বেছে নিন!'); return; }
+  if (o === d)  { alert('উৎস ও গন্তব্য একই হতে পারে না!'); return; }
+
+  let route = ROUTES[o]?.[d] || ROUTES[d]?.[o];
+  const res = document.getElementById('routeResult');
+
+  if (route) {
+    document.getElementById('rRoute').textContent = `${o} → ${d}`;
+    document.getElementById('rBuses').innerHTML   = route.buses.map(b => `<span class="bus-chip">🚌 ${b}</span>`).join('');
+    document.getElementById('rFare').textContent  = route.fare;
+    document.getElementById('rTime').textContent  = route.time;
+    document.getElementById('rTips').textContent  = `💡 ${route.tips || 'অফ-পিক আওয়ারে গেলে দ্রুত পৌঁছাবেন।'}`;
+    res.style.display = 'block';
+  } else {
+    res.style.display = 'none';
+    alert('😔 এই রুটের তথ্য এখনো নেই। মেট্রো ব্যবহার করে দেখুন!');
+  }
+}
+
+// ── পেজ নেভিগেশন ──
+function show(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+// ── ইনিট ──
+updateUI();
+updateClock();
+loadWeather();
+setInterval(updateClock, 1000);
+setInterval(updateUI,   60000);
+</script>
+</body>
+</html>
