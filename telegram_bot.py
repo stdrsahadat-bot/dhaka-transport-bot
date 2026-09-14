@@ -80,14 +80,16 @@ def get_start_button():
 
 
 def get_active_buttons():
-    """কথোপকথন চলাকালীন সহায়ক বাটন"""
+    """কথোপকথন চলাকালীন সহায়ক বাটন (মোবাইল ও পিসিতে ব্যালান্সড ও কাটার ঝুঁকিহীন)"""
     keyboard = [
         [
-            InlineKeyboardButton("🚗 লাইভ জ্যাম পরিস্থিতি", callback_data="btn_jam"),
+            InlineKeyboardButton("🚗 লাইভ জ্যাম", callback_data="btn_jam"),
             InlineKeyboardButton("🌡️ আবহাওয়া সতর্কতা", callback_data="btn_weather"),
         ],
         [
-            InlineKeyboardButton("🔄 নতুন করে শুরু", callback_data="btn_restart"),
+            InlineKeyboardButton("🔄 নতুন করে শুরু (/start)", callback_data="btn_restart"),
+        ],
+        [
             InlineKeyboardButton("✅ আমার কাজ শেষ / ধন্যবাদ", callback_data="btn_finish"),
         ]
     ]
@@ -242,7 +244,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
         f"{greeting_header}\n"
         f"📊 **বর্তমান ঢাকার অবস্থা:**\n"
-        f"• 🚗 ট্রাফিক: **{jam['level']}** ({jam['advice']})\n"
+        f"• 🚗 ট্রাফিক: **{jam['level']}**\n"
+        f"  ↳ 💡 *{jam['advice']}*\n"
         f"• 🌡️ আবহাওয়া: **{temp_str}** {rain_str}\n\n"
         "──────────────────────\n"
         "💬 **আপনি এখন ঠিক কোথা থেকে কোথায় যাবেন?**\n"
@@ -335,17 +338,17 @@ async def post_init(application: Application):
     """মেনুবারে পারসোনালাইজড বাটন সেট করা"""
     # ১. সাধারণ পাবলিক ইউজারদের মেনু (এখানে অ্যাডমিন সম্পূর্ণ গোপন থাকবে)
     public_commands = [
-        BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
-        BotCommand("subscribe", "জিমেইলে দৈনিক অ্যালার্ট সাবস্ক্রাইব"),
-        BotCommand("unsubscribe", "ইমেইল অ্যালার্ট বন্ধ করুন"),
+        BotCommand("start", "🚀 শুরু করুন / লাইভ আপডেট"),
+        BotCommand("subscribe", "📧 দৈনিক ইমেইল অ্যালার্ট"),
+        BotCommand("unsubscribe", "❌ ইমেইল অ্যালার্ট বন্ধ"),
     ]
     await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
 
     # ২. শুধুমাত্র আসল ক্রিয়েটর Sahadat vai-এর চ্যাটে সিক্রেট অ্যাডমিন শর্টকাট দেখাবে
     owner_commands = [
-        BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
-        BotCommand("subscribe", "জিমেইলে দৈনিক অ্যালার্ট সাবস্ক্রাইব"),
-        BotCommand("unsubscribe", "ইমেইল অ্যালার্ট বন্ধ করুন"),
+        BotCommand("start", "🚀 শুরু করুন / লাইভ আপডেট"),
+        BotCommand("subscribe", "📧 দৈনিক ইমেইল অ্যালার্ট"),
+        BotCommand("unsubscribe", "❌ ইমেইল অ্যালার্ট বন্ধ"),
         BotCommand("admin", "👑 অ্যাডমিন কন্ট্রোল প্যানেল"),
         BotCommand("users", "👥 ব্যবহারকারী তালিকা ও আইডি"),
     ]
