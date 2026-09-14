@@ -141,7 +141,7 @@ def send_alert_email() -> bool:
     msg.attach(MIMEText(_build_html(), 'html', 'utf-8'))
 
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=10) as server:
             server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
             server.sendmail(GMAIL_ADDRESS, RECIPIENT_EMAIL, msg.as_bytes())
         print(f"✅ ইমেইল পাঠানো হয়েছে [{now.strftime('%H:%M')}]")

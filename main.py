@@ -40,13 +40,6 @@ def main():
     print(f"  শুরুর সময়: {datetime.now().strftime('%d/%m/%Y %I:%M %p')}")
     print("-" * 55)
 
-    # স্টার্টআপ টেস্ট ইমেইল
-    print("📧 স্টার্টআপ টেস্ট ইমেইল পাঠানো হচ্ছে...")
-    try:
-        send_alert_email()
-    except Exception as e:
-        print(f"ইমেইল পাঠাতে সমস্যা: {e}")
-
     # ইমেইল শিডিউলার আলাদা থ্রেডে চালু
     t = threading.Thread(target=email_scheduler, daemon=True)
     t.start()
