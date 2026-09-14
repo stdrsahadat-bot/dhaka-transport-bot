@@ -14,6 +14,61 @@ from ai_agent import get_ai_response, clear_history, load_knowledge_base, active
 from email_sender import add_subscriber, remove_subscriber, load_subscribers
 
 
+import os
+import json
+from datetime import datetime
+
+USERS_FILE = os.path.join(os.path.dirname(__file__), "bot_users.json")
+
+
+def load_users() -> dict:
+    """টেলিগ্রাম ব্যবহারকারীদের ডাটাবেজ লোড করা"""
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading users: {e}")
+    return {}
+
+
+def save_users(users_dict: dict):
+    """ব্যবহারকারীদের ডাটাবেজ সংরক্ষণ করা"""
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users_dict, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Error saving users: {e}")
+
+
+def track_user(user):
+    """প্রতিটি ব্যবহারকারীর আইডি, নাম ও শেষ সক্রিয় হওয়ার সময় স্বয়ংক্রিয়ভাবে ট্র্যাক করা"""
+    if not user:
+        return
+    uid = str(user.id)
+    users = load_users()
+    now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+    full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "নামহীন"
+    username = f"@{user.username}" if user.username else "নেই"
+
+    if uid not in users:
+        users[uid] = {
+            "id": user.id,
+            "name": full_name,
+            "username": username,
+            "first_seen": now_str,
+            "last_seen": now_str,
+            "msg_count": 1,
+        }
+    else:
+        users[uid]["last_seen"] = now_str
+        users[uid]["name"] = full_name
+        users[uid]["username"] = username
+        users[uid]["msg_count"] = users[uid].get("msg_count", 0) + 1
+
+    save_users(users)
+
+
 def get_start_button():
     """কথোপকথন শেষে বা শুরুতে ফ্রেশ স্টার্ট বাটন"""
     keyboard = [
@@ -39,6 +94,7 @@ def get_active_buttons():
 
 # ─────────────────────────── /subscribe ───────────────────────
 async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     user_id = update.effective_user.id
     args = ctx.args
 
@@ -61,6 +117,7 @@ async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ─────────────────────────── /unsubscribe ─────────────────────
 async def cmd_unsubscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     user_id = update.effective_user.id
     success, reply_msg = remove_subscriber(user_id)
     await update.message.reply_text(reply_msg)
@@ -89,26 +146,63 @@ async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     else:
         sub_preview = "  - কোনো সাবস্ক্রাইবার এখনো নেই।"
 
+    users = load_users()
+    recent_users_text = ""
+    for u in list(users.values())[-5:]:
+        recent_users_text += f"  - {u['name']} ({u['username']}) | 🆔 `{u['id']}`\n"
+
     admin_text = (
         "👑 **অ্যাডমিন কন্ট্রোল সেন্টার | Dhaka Guide**\n"
         "───────────────────────────\n"
         f"• 👤 ক্রিয়েটর: **Md Sahadat Hossain**\n"
         f"• 🆔 টেলিগ্রাম আইডি: `{OWNER_TELEGRAM_ID}` (Verified ✅)\n"
+        f"• 👥 **মোট টেলিগ্রাম ইউজার:** **{len(users)}** জন\n"
         f"• 📬 দৈনিক ইমেইল সাবস্ক্রাইবার: **{len(subscribers)}** জন\n"
         f"• 🧠 মানুষের থেকে শেখা তথ্য: **{len(knowledge)}** টি\n"
-        f"• 👥 সক্রিয় ব্যবহারকারী সেশন: **{len(active_sessions)}** টি\n"
+        f"• 💬 সক্রিয় ব্যবহারকারী সেশন: **{len(active_sessions)}** টি\n"
         "• 🧹 মেমোরি ক্লিনআপ: ৪৮ ঘণ্টা পর পর অটো-ক্লিন সক্রিয়\n"
         "• ☁️ ক্লাউড সার্ভার: Railway 24/7 Worker\n\n"
-        f"👥 **সাম্প্রতিক সাবস্ক্রাইবারগণ:**\n{sub_preview}\n\n"
+        f"👥 **সাম্প্রতিক টেলিগ্রাম ইউজারগণ:**\n{recent_users_text or '  - এখনো কোনো রেকর্ড নেই।'}\n"
+        f"📬 **সাম্প্রতিক ইমেইল সাবস্ক্রাইবারগণ:**\n{sub_preview}\n\n"
         f"📚 **সাম্প্রতিক শেখা তথ্যের নমুনা:**\n{learned_preview}\n"
         "───────────────────────────\n"
-        "বট পুরোপুরি নিরাপদ ও সুস্থভাবে চলছে! 🟢"
+        "💡 সব ইউজারের পুরো ডিটেইলস দেখতে লিখুন: `/users`"
     )
     await update.message.reply_text(admin_text)
 
 
+# ─────────────────────────── /users ───────────────────────────
+async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != OWNER_TELEGRAM_ID:
+        await update.message.reply_text("⛔ অ্যাক্সেস অস্বীকৃত!")
+        return
+
+    users = load_users()
+    if not users:
+        await update.message.reply_text("ℹ️ এখনো কোনো ব্যবহারকারীর রেকর্ড নেই।")
+        return
+
+    lines = [f"👥 **বট ব্যবহারকারীদের পূর্ণাঙ্গ তালিকা (মোট: {len(users)} জন):**\n"]
+    for i, u in enumerate(users.values(), 1):
+        lines.append(
+            f"{i}. **{u['name']}** ({u['username']})\n"
+            f"   🆔 ID: `{u['id']}` | 💬 মেসেজ: {u.get('msg_count', 1)} বার\n"
+            f"   🕒 প্রথম আগমন: {u.get('first_seen', 'N/A')}\n"
+            f"   🕒 শেষ সক্রিয়: {u.get('last_seen', 'N/A')}\n"
+        )
+
+    msg = "\n".join(lines)
+    if len(msg) > 4000:
+        for chunk in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
+            await update.message.reply_text(chunk)
+    else:
+        await update.message.reply_text(msg)
+
+
 # ─────────────────────────── /start ───────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     user_id = update.effective_user.id
     clear_history(user_id)
 
@@ -148,6 +242,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ─────────────────── বাটনে ক্লিকের হ্যান্ডলার ───────────────────
 async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     query = update.callback_query
     await query.answer()
     data = query.data
@@ -183,6 +278,7 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 # ─────────────────── টেক্সট মেসেজ হ্যান্ডলার ───────────────────
 async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     text = update.message.text or ""
     user_id = update.effective_user.id
     
@@ -210,6 +306,7 @@ async def post_init(application: Application):
         BotCommand("subscribe", "জিমেইলে দৈনিক অ্যালার্ট সাবস্ক্রাইব"),
         BotCommand("unsubscribe", "ইমেইল অ্যালার্ট বন্ধ করুন"),
         BotCommand("admin", "👑 অ্যাডমিন কন্ট্রোল প্যানেল"),
+        BotCommand("users", "👥 ব্যবহারকারী তালিকা ও আইডি"),
     ]
     try:
         await application.bot.set_my_commands(
@@ -241,6 +338,7 @@ def run_telegram_bot():
     app.add_handler(CommandHandler("subscribe", cmd_subscribe))
     app.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     app.add_handler(CommandHandler("admin", cmd_admin))
+    app.add_handler(CommandHandler("users", cmd_users))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
