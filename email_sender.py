@@ -4,11 +4,12 @@ import re
 import smtplib
 import threading
 import time
+import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-from config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL
+from config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL, TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID
 from weather import get_dhaka_weather, weather_advice
 from jam_analyzer import get_jam_status, get_departure_advice
 
@@ -287,13 +288,86 @@ def _build_html() -> str:
 </html>"""
 
 
+def _send_single_email(recipient_email: str, msg: MIMEMultipart) -> tuple[bool, str]:
+    """
+    যেকোনো ক্লাউড (Railway) বা লোকাল সার্ভার থেকে শতভাগ সফলভাবে ইমেইল পাঠানোর দ্বৈত পোর্ট মেকানিজম
+    ১ম চেষ্টা: Port 465 (SSL)
+    ২য় চেষ্টা: Port 587 (STARTTLS - যা ক্লাউড সার্ভারে ফায়ারওয়াল বাইপাস করার জন্য সবচেয়ে নির্ভরযোগ্য)
+    """
+    err_465 = ""
+    # মেথড ১: Port 465 (Direct SSL)
+    try:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20) as server:
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_ADDRESS, recipient_email, msg.as_bytes())
+        print(f"✅ ইমেইল সফলভাবে পাঠানো হয়েছে (Port 465 SSL): {recipient_email}")
+        return True, "Port 465 SSL"
+    except Exception as e:
+        err_465 = str(e)
+        print(f"⚠️ Port 465 ব্যর্থ ({e}), Port 587 STARTTLS দিয়ে চেষ্টা করা হচ্ছে...")
+
+    # মেথড ২: Port 587 (STARTTLS)
+    try:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=25) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_ADDRESS, recipient_email, msg.as_bytes())
+        print(f"✅ ইমেইল সফলভাবে পাঠানো হয়েছে (Port 587 STARTTLS): {recipient_email}")
+        return True, "Port 587 STARTTLS"
+    except Exception as e:
+        err_587 = str(e)
+        print(f"❌ Port 587 ব্যর্থ: {e}")
+        return False, f"Port 465: {err_465} | Port 587: {err_587}"
+
+
+def notify_owner_delivery(recipient_email: str, success: bool, method_or_err: str):
+    """ইমেইল ডেলিভারির সাথে সাথে Sahadat vai-কে টেলিগ্রামে নোটিফিকেশন দেওয়া"""
+    try:
+        status_icon = "✅" if success else "❌"
+        title = "লাইভ স্যাম্পল বুলেটিন জিমেইলে পাঠানো হয়েছে!" if success else "ইমেইল পাঠাতে ব্যর্থ হয়েছে!"
+        now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        text = (
+            f"{status_icon} <b>{title}</b>\n"
+            "───────────────────────────\n"
+            f"📧 <b>প্রাপক:</b> <code>{recipient_email}</code>\n"
+            f"⚙️ <b>ডেলিভারি স্ট্যাটাস:</b> {method_or_err}\n"
+            f"🕒 <b>সময়:</b> {now_str}\n"
+        )
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        requests.post(url, json={
+            "chat_id": OWNER_TELEGRAM_ID,
+            "text": text,
+            "parse_mode": "HTML"
+        }, timeout=8)
+    except Exception as e:
+        print(f"Owner delivery alert note: {e}")
+
+
 def send_welcome_email(recipient_email: str) -> bool:
     """সাবস্ক্রাইব করার পর তাৎক্ষণিক প্রিমিয়াম লাইভ স্যাম্পল বুলেটিন পাঠানো (প্রমাণস্বরূপ)"""
     now = datetime.now()
-    weather = get_dhaka_weather()
-    jam = get_jam_status()
-    depart = get_departure_advice()
-    w_advice = weather_advice(weather)
+    try:
+        weather = get_dhaka_weather()
+    except Exception:
+        weather = None
+
+    try:
+        jam = get_jam_status()
+    except Exception:
+        jam = {'level': 'স্বাভাবিক', 'advice': 'রাস্তায় নিয়মিত গতি রয়েছে।'}
+
+    try:
+        depart = get_departure_advice()
+    except Exception:
+        depart = 'নিরাপদে যাত্রা করুন।'
+
+    try:
+        w_advice = weather_advice(weather)
+    except Exception:
+        w_advice = 'স্বাভাবিক আবহাওয়া।'
+
     date_str = now.strftime('%d %B, %Y | %I:%M %p')
 
     # জ্যামের কালার
@@ -497,18 +571,14 @@ def send_welcome_email(recipient_email: str) -> bool:
     msg.attach(MIMEText(plain_text, 'plain', 'utf-8'))
     msg.attach(MIMEText(html_content, 'html', 'utf-8'))
 
-    for attempt in range(2):
-        try:
-            with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=25) as server:
-                server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-                server.sendmail(GMAIL_ADDRESS, recipient_email, msg.as_bytes())
-            print(f"✅ স্বাগতম ও লাইভ স্যাম্পল ইমেইল পাঠানো হয়েছে to {recipient_email}")
-            return True
-        except Exception as e:
-            print(f"⚠️ স্বাগতম ইমেইল পাঠাতে চেষ্টা {attempt + 1} ব্যর্থ: {e}")
-            if attempt == 0:
-                time.sleep(2)
-    return False
+    try:
+        success, detail = _send_single_email(recipient_email, msg)
+        notify_owner_delivery(recipient_email, success, detail)
+        return success
+    except Exception as e:
+        print(f"❌ send_welcome_email fatal error: {e}")
+        notify_owner_delivery(recipient_email, False, f"Fatal error: {e}")
+        return False
 
 
 def send_alert_email() -> bool:
@@ -524,23 +594,21 @@ def send_alert_email() -> bool:
     html = _build_html()
     success_count = 0
 
-    try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
-            server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
-            for email in recipients:
-                try:
-                    msg = MIMEMultipart('alternative')
-                    msg['Subject'] = subject
-                    msg['From']    = GMAIL_ADDRESS
-                    msg['To']      = email
-                    msg.attach(MIMEText(html, 'html', 'utf-8'))
-                    server.sendmail(GMAIL_ADDRESS, email, msg.as_bytes())
-                    success_count += 1
-                except Exception as sub_err:
-                    print(f"Failed to send to {email}: {sub_err}")
+    for email in recipients:
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From']    = f"Dhaka Transport Guide <{GMAIL_ADDRESS}>"
+            msg['To']      = email
+            msg['Reply-To'] = GMAIL_ADDRESS
+            msg.attach(MIMEText("ঢাকা ট্রাফিক ও আবহাওয়া বুলেটিন দেখতে আপনার ইমেইল ক্লায়েন্টের HTML ভিউ সক্রিয় করুন।", 'plain', 'utf-8'))
+            msg.attach(MIMEText(html, 'html', 'utf-8'))
 
-        print(f"✅ সফলভাবে {success_count}/{len(recipients)} জনের জিমেইলে বুলেটিন পাঠানো হয়েছে [{now.strftime('%H:%M')}]")
-        return True
-    except Exception as e:
-        print(f"❌ ইমেইল পাঠাতে সমস্যা: {e}")
-        return False
+            ok, _ = _send_single_email(email, msg)
+            if ok:
+                success_count += 1
+        except Exception as sub_err:
+            print(f"Failed to send to {email}: {sub_err}")
+
+    print(f"✅ সফলভাবে {success_count}/{len(recipients)} জনের জিমেইলে বুলেটিন পাঠানো হয়েছে [{now.strftime('%H:%M')}]")
+    return success_count > 0

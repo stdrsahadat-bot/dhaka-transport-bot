@@ -286,6 +286,28 @@ async def cmd_subscribers(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(msg, parse_mode="HTML")
 
 
+# ─────────────────────────── /sendtest ────────────────────────
+async def cmd_sendtest(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
+    user_id = update.effective_user.id
+    if user_id != OWNER_TELEGRAM_ID:
+        await update.message.reply_text("⛔ <b>অ্যাক্সেস অস্বীকৃত!</b>", parse_mode="HTML")
+        return
+
+    args = ctx.args
+    if not args:
+        await update.message.reply_text(
+            "💡 <b>যে কোনো ইমেইলে সরাসরি টেস্ট বুলেটিন পাঠাতে লিখুন:</b>\n"
+            "<code>/sendtest target@gmail.com</code>",
+            parse_mode="HTML"
+        )
+        return
+
+    target_email = args[0].strip().lower()
+    await update.message.reply_text(f"🚀 <code>{target_email}</code> ঠিকানায় ডুয়েল-পোর্ট ইঞ্জিনে লাইভ স্যাম্পল বুলেটিন পাঠানো হচ্ছে...")
+    trigger_welcome_email_async(target_email)
+
+
 # ─────────────────────────── /start ───────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     track_user(update.effective_user)
@@ -461,6 +483,7 @@ async def post_init(application: Application):
         BotCommand("admin", "👑 Admin Panel"),
         BotCommand("users", "👥 Users List"),
         BotCommand("subscribers", "📬 Subscribers List"),
+        BotCommand("sendtest", "🧪 Test Email Dispatch"),
     ]
     try:
         await application.bot.set_my_commands(
@@ -495,6 +518,8 @@ def run_telegram_bot():
     app.add_handler(CommandHandler("users", cmd_users))
     app.add_handler(CommandHandler("subscribers", cmd_subscribers))
     app.add_handler(CommandHandler("emails", cmd_subscribers))
+    app.add_handler(CommandHandler("sendtest", cmd_sendtest))
+    app.add_handler(CommandHandler("testmail", cmd_sendtest))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
