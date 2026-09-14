@@ -65,7 +65,7 @@ def get_jam_status() -> dict:
     return {'level': level, 'emoji': emoji, 'advice': advice, 'problem_areas': areas}
 
 
-def get_departure_advice() -> str:
+def get_departure_advice(jam_level: str = None) -> str:
     hour = datetime.now().hour
     if hour < 7:
         return "✅ এখনই বের হন — রাস্তা একদম ফাঁকা!"
