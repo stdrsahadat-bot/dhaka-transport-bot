@@ -96,6 +96,30 @@ def get_active_buttons():
     return InlineKeyboardMarkup(keyboard)
 
 
+async def notify_owner_new_subscriber(bot, user, email: str):
+    """নতুন কেউ জিমেইল যোগ করলে সাথে সাথে Sahadat vai-কে টেলিগ্রামে নোটিফিকেশন দেওয়া"""
+    if not user:
+        return
+    try:
+        full_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "নামহীন"
+        username = f"@{user.username}" if user.username else "নেই"
+        now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        alert_msg = (
+            "🔔 <b>নতুন জিমেইল সাবস্ক্রাইবার যুক্ত হয়েছে!</b>\n"
+            "───────────────────────────\n"
+            f"📧 <b>ইমেইল:</b> <code>{html.escape(email)}</code>\n"
+            f"👤 <b>নাম:</b> {html.escape(full_name)}\n"
+            f"🏷️ <b>ইউজারনেম:</b> {html.escape(username)}\n"
+            f"🆔 <b>টেলিগ্রাম আইডি:</b> <code>{user.id}</code>\n"
+            f"🕒 <b>সময়:</b> {now_str}\n"
+            "───────────────────────────\n"
+            "💡 সকল সাবস্ক্রাইবার দেখতে লিখুন: <code>/subscribers</code>"
+        )
+        await bot.send_message(chat_id=OWNER_TELEGRAM_ID, text=alert_msg, parse_mode="HTML")
+    except Exception as e:
+        print(f"Error sending subscriber alert to owner: {e}")
+
+
 # ─────────────────────────── /subscribe ───────────────────────
 async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     track_user(update.effective_user)
@@ -122,6 +146,8 @@ async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     success, reply_msg = add_subscriber(email, user_id)
     ctx.user_data["awaiting_email"] = False
     await update.message.reply_text(reply_msg)
+    if success:
+        await notify_owner_new_subscriber(ctx.bot, update.effective_user, email)
 
 
 # ─────────────────────────── /unsubscribe ─────────────────────
@@ -180,7 +206,8 @@ async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"📬 <b>সাম্প্রতিক ইমেইল সাবস্ক্রাইবারগণ:</b>\n{sub_preview}\n\n"
         f"📚 <b>সাম্প্রতিক শেখা তথ্যের নমুনা:</b>\n{learned_preview}\n"
         "───────────────────────────\n"
-        "💡 সব ইউজারের পুরো ডিটেইলস দেখতে লিখুন: <code>/users</code>"
+        "💡 সব ইউজারের ডিটেইলস দেখতে: <code>/users</code>\n"
+        "💡 সব সাবস্ক্রাইবারের ইমেইল তালিকা দেখতে: <code>/subscribers</code>"
     )
     await update.message.reply_text(admin_text, parse_mode="HTML")
 
@@ -207,6 +234,48 @@ async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"   🆔 ID: <code>{u.get('id', '')}</code> | 💬 মেসেজ: {u.get('msg_count', 1)} বার\n"
             f"   🕒 প্রথম আগমন: {u.get('first_seen', 'N/A')}\n"
             f"   🕒 শেষ সক্রিয়: {u.get('last_seen', 'N/A')}\n"
+        )
+
+    msg = "\n".join(lines)
+    if len(msg) > 4000:
+        for chunk in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
+            await update.message.reply_text(chunk, parse_mode="HTML")
+    else:
+        await update.message.reply_text(msg, parse_mode="HTML")
+
+
+# ─────────────────────────── /subscribers ─────────────────────
+async def cmd_subscribers(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
+    user_id = update.effective_user.id
+    if user_id != OWNER_TELEGRAM_ID:
+        await update.message.reply_text("⛔ <b>অ্যাক্সেস অস্বীকৃত!</b>", parse_mode="HTML")
+        return
+
+    subscribers = load_subscribers()
+    if not subscribers:
+        await update.message.reply_text("ℹ️ এখনো কোনো জিমেইল সাবস্ক্রাইবার যুক্ত হয়নি।")
+        return
+
+    users = load_users()
+    lines = [
+        "📬 <b>জিমেইল বুলেটিন সাবস্ক্রাইবারদের পূর্ণাঙ্গ তালিকা:</b>\n"
+        f"📊 <b>মোট সাবস্ক্রাইবার:</b> {len(subscribers)} জন\n"
+        "───────────────────────────\n"
+    ]
+    for i, s in enumerate(subscribers, 1):
+        email = html.escape(str(s.get('email', 'N/A')))
+        sub_time = html.escape(str(s.get('subscribed_at', s.get('updated_at', 'N/A'))))
+        chat_id = str(s.get('chat_id', 'N/A'))
+        user_info = users.get(chat_id, {})
+        user_name = html.escape(str(user_info.get('name', 'নামহীন')))
+        username = html.escape(str(user_info.get('username', 'নেই')))
+        
+        lines.append(
+            f"{i}. 📧 <code>{email}</code>\n"
+            f"   👤 নাম: <b>{user_name}</b> ({username})\n"
+            f"   🆔 Telegram ID: <code>{chat_id}</code>\n"
+            f"   🕒 সাবস্ক্রাইব সময়: {sub_time}\n"
         )
 
     msg = "\n".join(lines)
@@ -321,6 +390,8 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             success, reply_msg = add_subscriber(email, user_id)
             ctx.user_data["awaiting_email"] = False
             await update.message.reply_text(reply_msg)
+            if success:
+                await notify_owner_new_subscriber(ctx.bot, update.effective_user, email)
             return
         elif ctx.user_data.get("awaiting_email"):
             await update.message.reply_text("⚠️ অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস লিখুন (যেমন: name@gmail.com) অথবা বাতিল করতে /start লিখুন।")
@@ -351,6 +422,7 @@ async def post_init(application: Application):
         BotCommand("unsubscribe", "❌ Unsubscribe"),
         BotCommand("admin", "👑 Admin Panel"),
         BotCommand("users", "👥 Users List"),
+        BotCommand("subscribers", "📬 Subscribers List"),
     ]
     try:
         await application.bot.set_my_commands(
@@ -383,6 +455,8 @@ def run_telegram_bot():
     app.add_handler(CommandHandler("unsubscribe", cmd_unsubscribe))
     app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CommandHandler("users", cmd_users))
+    app.add_handler(CommandHandler("subscribers", cmd_subscribers))
+    app.add_handler(CommandHandler("emails", cmd_subscribers))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
