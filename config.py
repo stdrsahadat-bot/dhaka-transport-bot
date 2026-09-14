@@ -22,3 +22,6 @@ TELEGRAM_BOT_TOKEN  = os.environ.get("TELEGRAM_BOT_TOKEN", _dec("ODg5NDE0MTg3NTp
 GEMINI_API_KEY      = os.environ.get("GEMINI_API_KEY", _dec("QVEuQWI4Uk42Sm1LOGU5eGVyTm9ZMUtRdEoxM2cwWjl6WW5nRmFZcS1ZTElCdFVpdmVyUlE="))
 
 ALERT_TIMES = ["07:00", "12:00", "18:00"]
+
+# 👑 ক্রিয়েটর ও অ্যাডমিনের ভেরিফাইড টেলিগ্রাম আইডি
+OWNER_TELEGRAM_ID = int(os.environ.get("OWNER_TELEGRAM_ID", "7042555228"))

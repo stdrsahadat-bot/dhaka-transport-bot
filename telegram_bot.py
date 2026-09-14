@@ -7,10 +7,10 @@ from telegram.ext import (
     CallbackQueryHandler, filters, ContextTypes,
 )
 from telegram.request import HTTPXRequest
-from config import TELEGRAM_BOT_TOKEN
+from config import TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID
 from jam_analyzer import get_jam_status
 from weather import get_dhaka_weather
-from ai_agent import get_ai_response, clear_history
+from ai_agent import get_ai_response, clear_history, load_knowledge_base, active_sessions
 
 
 def get_start_button():
@@ -36,6 +36,38 @@ def get_active_buttons():
     return InlineKeyboardMarkup(keyboard)
 
 
+# ─────────────────────────── /admin ───────────────────────────
+async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id != OWNER_TELEGRAM_ID:
+        await update.message.reply_text(
+            "⛔ **অ্যাক্সেস অস্বীকৃত!**\n\nএই বিশেষ অ্যাডমিন প্যানেলটি শুধুমাত্র বটের অফিসিয়াল প্রতিষ্ঠাতা ও ক্রিয়েটর Md Sahadat Hossain (Sahadat vai)-এর জন্য সংরক্ষিত।"
+        )
+        return
+
+    knowledge = load_knowledge_base()
+    learned_preview = ""
+    if knowledge:
+        learned_preview = "\n".join([f"• {k['info']} ({k['learned_at']})" for k in knowledge[-5:]])
+    else:
+        learned_preview = "• এখনো কোনো নতুন তথ্য জমা হয়নি।"
+
+    admin_text = (
+        "👑 **অ্যাডমিন কন্ট্রোল সেন্টার | Dhaka Guide**\n"
+        "───────────────────────────\n"
+        f"• 👤 ক্রিয়েটর: **Md Sahadat Hossain**\n"
+        f"• 🆔 টেলিগ্রাম আইডি: `{OWNER_TELEGRAM_ID}` (Verified ✅)\n"
+        f"• 🧠 মানুষের থেকে শেখা তথ্য: **{len(knowledge)}** টি\n"
+        f"• 👥 সক্রিয় ব্যবহারকারী সেশন: **{len(active_sessions)}** টি\n"
+        "• 🧹 মেমোরি ক্লিনআপ: ৪৮ ঘণ্টা পর পর অটো-ক্লিন সক্রিয়\n"
+        "• ☁️ ক্লাউড সার্ভার: Railway 24/7 Worker\n\n"
+        f"📚 **সাম্প্রতিক শেখা তথ্যের নমুনা:**\n{learned_preview}\n"
+        "───────────────────────────\n"
+        "বট পুরোপুরি নিরাপদ ও সুস্থভাবে চলছে! 🟢"
+    )
+    await update.message.reply_text(admin_text)
+
+
 # ─────────────────────────── /start ───────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
@@ -48,9 +80,19 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     temp_str = f"{w['temp']}°C" if w else "স্বাভাবিক"
     rain_str = f"বৃষ্টির সম্ভাবনা: {w['rain_chance']}%" if w else ""
     
+    if user_id == OWNER_TELEGRAM_ID:
+        greeting_header = (
+            "👑 **আস্সালামু আলাইকুম Sahadat vai!**\n"
+            "ঢাকা ট্রান্সপোর্ট এআই এজেন্টে স্বাগতম। আপনি আমার ভেরিফাইড ক্রিয়েটর ও অ্যাডমিন। 🇧🇩\n"
+        )
+    else:
+        greeting_header = (
+            "🚌 **আস্সালামু আলাইকুম!**\n"
+            "ঢাকা ট্রান্সপোর্ট এআই এজেন্টে আপনাকে স্বাগতম। 🇧🇩\n"
+        )
+
     welcome_text = (
-        "🚌 **আস্সালামু আলাইকুম!**\n"
-        "ঢাকা ট্রান্সপোর্ট এআই এজেন্টে আপনাকে স্বাগতম। 🇧🇩\n\n"
+        f"{greeting_header}\n"
         f"📊 **বর্তমান ঢাকার অবস্থা:**\n"
         f"• 🚗 ট্রাফিক: **{jam['level']}** ({jam['advice']})\n"
         f"• 🌡️ আবহাওয়া: **{temp_str}** {rain_str}\n\n"
@@ -117,6 +159,7 @@ async def post_init(application: Application):
     """মেনুবারে স্থায়ী বাটন সেট করা"""
     commands = [
         BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
+        BotCommand("admin", "অ্যাডমিন প্যানেল (Sahadat vai)"),
     ]
     await application.bot.set_my_commands(commands)
 
@@ -139,6 +182,7 @@ def run_telegram_bot():
     )
 
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("admin", cmd_admin))
     app.add_handler(CallbackQueryHandler(handle_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
 
