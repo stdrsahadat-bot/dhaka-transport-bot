@@ -5,10 +5,10 @@ import time
 import threading
 from datetime import datetime
 from dotenv import load_dotenv
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # .env ফাইল লোড করা (PC-তে চললে)
 load_dotenv()
-
 
 # উইন্ডোজ কনসোলে বাংলা ও ইমোজি সাপোর্ট নিশ্চিত করা
 try:
@@ -20,6 +20,27 @@ except Exception:
 from config import ALERT_TIMES
 from email_sender import send_alert_email
 from telegram_bot import run_telegram_bot
+
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """ক্লাউড সার্ভারের হেলথ চেক রেসপন্ডার (Railway/Render বন্ধ হওয়া রোধ করে)"""
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'text/plain; charset=utf-8')
+        self.end_headers()
+        self.wfile.write(b"OK - Dhaka Transport AI Bot is Running 24/7!")
+
+    def log_message(self, format, *args):
+        pass
+
+
+def run_health_server():
+    port = int(os.environ.get("PORT", 8080))
+    try:
+        server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+        server.serve_forever()
+    except Exception as e:
+        print(f"Health server note: {e}")
 
 
 def email_scheduler():
@@ -39,6 +60,10 @@ def main():
     print("=" * 55)
     print(f"  শুরুর সময়: {datetime.now().strftime('%d/%m/%Y %I:%M %p')}")
     print("-" * 55)
+
+    # ক্লাউড হেলথ চেক সার্ভার চালু (যাতে Railway/Render ক্র্যাশ না করে)
+    h_thread = threading.Thread(target=run_health_server, daemon=True)
+    h_thread.start()
 
     # ইমেইল শিডিউলার আলাদা থ্রেডে চালু
     t = threading.Thread(target=email_scheduler, daemon=True)
