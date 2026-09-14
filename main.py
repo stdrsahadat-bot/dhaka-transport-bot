@@ -43,12 +43,19 @@ def run_health_server():
         print(f"Health server note: {e}")
 
 
+from ai_agent import cleanup_expired_sessions
+
+
 def email_scheduler():
-    """পর্দার পেছনে চলে — নির্দিষ্ট সময়ে ইমেইল পাঠায়"""
+    """পর্দার পেছনে চলে — নির্দিষ্ট সময়ে ইমেইল পাঠায় এবং পুরানো সেশন ক্লিন করে"""
     for t in ALERT_TIMES:
         schedule.every().day.at(t).do(send_alert_email)
 
+    # প্রতি ৬ ঘণ্টা পর পর পুরানো ২ দিনের নিষ্ক্রিয় সেশন মেমোরি থেকে মুছে দেওয়া
+    schedule.every(6).hours.do(cleanup_expired_sessions)
+
     print(f"📧 Gmail শিডিউল সেট হয়েছে: {', '.join(ALERT_TIMES)}")
+    print("🧹 অটো সেশন ক্লিনআপ শিডিউল সক্রিয় হয়েছে (প্রতি ৬ ঘণ্টায় চেক)")
     while True:
         schedule.run_pending()
         time.sleep(30)
