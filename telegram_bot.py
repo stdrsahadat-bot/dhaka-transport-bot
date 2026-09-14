@@ -74,8 +74,7 @@ def track_user(user):
 def get_start_button():
     """কথোপকথন শেষে বা শুরুতে ফ্রেশ স্টার্ট বাটন"""
     keyboard = [
-        [InlineKeyboardButton("🚀 নতুন যাত্রা শুরু করুন (/start)", callback_data="btn_restart")],
-        [InlineKeyboardButton("📧 ইমেইল বুলেটিন সাবস্ক্রাইব", callback_data="btn_subscribe")]
+        [InlineKeyboardButton("🚀 নতুন যাত্রা শুরু করুন (/start)", callback_data="btn_restart")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -88,10 +87,7 @@ def get_active_buttons():
             InlineKeyboardButton("🌡️ আবহাওয়া সতর্কতা", callback_data="btn_weather"),
         ],
         [
-            InlineKeyboardButton("📧 ইমেইল বুলেটিন সাবস্ক্রাইব", callback_data="btn_subscribe"),
             InlineKeyboardButton("🔄 নতুন করে শুরু", callback_data="btn_restart"),
-        ],
-        [
             InlineKeyboardButton("✅ আমার কাজ শেষ / ধন্যবাদ", callback_data="btn_finish"),
         ]
     ]
