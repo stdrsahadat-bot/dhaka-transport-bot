@@ -27,5 +27,5 @@ ALERT_TIMES = ["07:00", "12:00", "18:00"]
 OWNER_TELEGRAM_ID = int(os.environ.get("OWNER_TELEGRAM_ID", "7042555228"))
 
 # 🌐 ক্লাউড সার্ভার (Railway) থেকে সরাসরি ইমেইল পাঠানোর HTTPS রিলে
-GOOGLE_SCRIPT_URL   = os.environ.get("GOOGLE_SCRIPT_URL", "").strip()
+GOOGLE_SCRIPT_URL   = os.environ.get("GOOGLE_SCRIPT_URL", _dec("aHR0cHM6Ly9zY3JpcHQuZ29vZ2xlLmNvbS9tYWNyb3Mvcy9BS2Z5Y2J6bWt1WG53MU9kbF9uLTNPNGtaTXRlb3NvbmQ4N2prSTB3YnlWSjBCRVNEQkRDRW14WDZvUHNRN2FLOTl1RE11cXlJZy9leGVj")).strip()
 RESEND_API_KEY      = os.environ.get("RESEND_API_KEY", "").strip()

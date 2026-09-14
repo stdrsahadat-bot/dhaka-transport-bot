@@ -309,9 +309,12 @@ def _send_via_https(recipient_email: str, subject: str, html_content: str) -> tu
                 "to": recipient_email,
                 "subject": subject,
                 "html": html_content
-            }, timeout=20)
+            }, timeout=25)
             if resp.status_code == 200:
-                print(f"✅ HTTPS Google Script Relay দিয়ে ইমেইল পাঠানো হয়েছে: {recipient_email}")
+                try:
+                    print(f"HTTPS Google Script Relay success: {recipient_email}")
+                except Exception:
+                    pass
                 return True, "HTTPS Google Apps Script Relay (Port 443 ✅)"
             else:
                 print(f"Google Script HTTP status: {resp.status_code}")
