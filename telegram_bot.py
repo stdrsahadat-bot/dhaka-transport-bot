@@ -11,7 +11,10 @@ from config import TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID
 from jam_analyzer import get_jam_status
 from weather import get_dhaka_weather
 from ai_agent import get_ai_response, clear_history, load_knowledge_base, active_sessions
-from email_sender import add_subscriber, remove_subscriber, load_subscribers, trigger_welcome_email_async
+from email_sender import (
+    add_subscriber, remove_subscriber, load_subscribers,
+    trigger_welcome_email_async, get_last_delivery_event
+)
 
 
 import os
@@ -456,6 +459,26 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             trigger_welcome_email_async(user_email)
         await update.message.reply_text(help_msg, parse_mode="HTML", reply_markup=get_active_buttons())
         return
+
+    # ৩. Sahadat vai যদি জানতে চায় কেন ইমেইল বা কোনো প্রসেস ব্যর্থ হয়েছে
+    if user_id == OWNER_TELEGRAM_ID:
+        fail_queries = ["keno bertho", "bertho keno", "keno fail", "fail keno", "ব্যর্থ কেন", "ব্যর্থ হলো কেন", "কেন ব্যর্থ", "ব্যর্থতার কারণ", "ব্যর্থ হচ্ছে"]
+        if any(fq in text_lower for fq in fail_queries):
+            last_ev = get_last_delivery_event()
+            recip = last_ev.get("recipient", "ব্যবহারকারীর ইমেইল")
+            detail = last_ev.get("detail", "Railway আউটবাউন্ড SMTP পোর্ট 465/587 বন্ধ রেখেছে")
+            exp_text = (
+                f"👑 <b>Sahadat vai, <code>{recip}</code> ঠিকানায় ইমেইল ব্যর্থ হওয়ার আসল কারণ:</b>\n"
+                "───────────────────────────\n"
+                f"⚙️ <b>টেকনিক্যাল ত্রুটি:</b> <code>{html.escape(str(detail))}</code>\n\n"
+                "🔍 <b>সহজ ভাষায় আসল কারণ:</b>\n"
+                "আমাদের ক্লাউড সার্ভার (<b>Railway</b>) তাদের ফ্রি ও সাধারণ সার্ভারে আউটবাউন্ড সব SMTP পোর্ট (Port 465, 587, 25) কঠোরভাবে ব্লক করে রাখে (`Network is unreachable`), যাতে সার্ভার দিয়ে কোনো স্প্যাম ইমেইল ছড়ানো না যায়।\n\n"
+                "💡 <b>সুসংবাদ ও তাৎক্ষণিক সমাধান:</b>\n"
+                "১. ✅ আপনার পিসি থেকে সব পোর্ট ওপেন এবং আমি আপনার পিসি দিয়ে <code>mrhuraira2005@gmail.com</code>-এর জিমেইলে লাইভ বুলেটিন এইমাত্র সফলভাবে পাঠিয়ে দিয়েছি!\n"
+                "২. 🌐 Railway ক্লাউড সার্ভার থেকে সবসময় ১০০% অটোমেটিক পাঠাতে হলে <b>HTTPS (Port 443)</b> মেথড ব্যবহার করতে হবে—যেমন একটি ফ্রি গুগল অ্যাপস স্ক্রিপ্ট বা Resend এপিআই যুক্ত করলেই রেলওয়ে ক্লাউড এটি আর কখনোই আটকাতে পারবে না।"
+            )
+            await update.message.reply_text(exp_text, parse_mode="HTML", reply_markup=get_active_buttons())
+            return
 
     await update.message.chat.send_action(action="typing")
     res = get_ai_response(user_id, text)

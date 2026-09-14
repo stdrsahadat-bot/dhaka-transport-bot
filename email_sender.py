@@ -9,7 +9,11 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 
-from config import GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL, TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID
+from config import (
+    GMAIL_ADDRESS, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL,
+    TELEGRAM_BOT_TOKEN, OWNER_TELEGRAM_ID,
+    GOOGLE_SCRIPT_URL, RESEND_API_KEY
+)
 from weather import get_dhaka_weather, weather_advice
 from jam_analyzer import get_jam_status, get_departure_advice
 
@@ -288,27 +292,89 @@ def _build_html() -> str:
 </html>"""
 
 
-def _send_single_email(recipient_email: str, msg: MIMEMultipart) -> tuple[bool, str]:
+last_delivery_event = {}
+
+
+def get_last_delivery_event() -> dict:
+    """সর্বশেষ ইমেইল ডেলিভারি ইভেন্টের তথ্য ফেরত দেয়"""
+    return last_delivery_event
+
+
+def _send_via_https(recipient_email: str, subject: str, html_content: str) -> tuple[bool, str]:
+    """HTTPS (Port 443) এর মাধ্যমে ইমেইল পাঠানো — যা Railway ক্লাউড কখনো ব্লক করতে পারে না"""
+    # মেথড ১: Google Apps Script Webhook Relay (100% Free, sends from Sahadat vai's Gmail)
+    if GOOGLE_SCRIPT_URL:
+        try:
+            resp = requests.post(GOOGLE_SCRIPT_URL, json={
+                "to": recipient_email,
+                "subject": subject,
+                "html": html_content
+            }, timeout=20)
+            if resp.status_code == 200:
+                print(f"✅ HTTPS Google Script Relay দিয়ে ইমেইল পাঠানো হয়েছে: {recipient_email}")
+                return True, "HTTPS Google Apps Script Relay (Port 443 ✅)"
+            else:
+                print(f"Google Script HTTP status: {resp.status_code}")
+        except Exception as ge:
+            print(f"Google Script HTTPS error: {ge}")
+
+    # মেথড ২: Resend HTTPS API (Port 443)
+    if RESEND_API_KEY:
+        try:
+            resp = requests.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {RESEND_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "from": "Dhaka Transport Guide <onboarding@resend.dev>",
+                    "to": [recipient_email],
+                    "subject": subject,
+                    "html": html_content
+                },
+                timeout=20
+            )
+            if resp.status_code in (200, 201):
+                print(f"✅ HTTPS Resend API দিয়ে ইমেইল পাঠানো হয়েছে: {recipient_email}")
+                return True, "HTTPS Resend API (Port 443 ✅)"
+            else:
+                print(f"Resend HTTP error: {resp.text}")
+        except Exception as re_err:
+            print(f"Resend HTTPS error: {re_err}")
+
+    return False, ""
+
+
+def _send_single_email(recipient_email: str, msg: MIMEMultipart, subject: str = "", html_content: str = "") -> tuple[bool, str]:
     """
-    যেকোনো ক্লাউড (Railway) বা লোকাল সার্ভার থেকে শতভাগ সফলভাবে ইমেইল পাঠানোর দ্বৈত পোর্ট মেকানিজম
-    ১ম চেষ্টা: Port 465 (SSL)
-    ২য় চেষ্টা: Port 587 (STARTTLS - যা ক্লাউড সার্ভারে ফায়ারওয়াল বাইপাস করার জন্য সবচেয়ে নির্ভরযোগ্য)
+    যেকোনো ক্লাউড (Railway) বা লোকাল সার্ভার থেকে শতভাগ সফলভাবে ইমেইল পাঠানোর মেকানিজম
+    ১. HTTPS রিলে (যদি কনফিগার করা থাকে — Railway-তে পোর্ট ব্লকিং বাইপাস করতে)
+    ২. Port 465 (SSL)
+    ৩. Port 587 (STARTTLS)
     """
+    # মেথড ০: HTTPS Relay
+    if GOOGLE_SCRIPT_URL or RESEND_API_KEY:
+        ok, method = _send_via_https(recipient_email, subject, html_content)
+        if ok:
+            return True, method
+
     err_465 = ""
     # মেথড ১: Port 465 (Direct SSL)
     try:
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20) as server:
+        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=15) as server:
             server.login(GMAIL_ADDRESS, GMAIL_APP_PASSWORD)
             server.sendmail(GMAIL_ADDRESS, recipient_email, msg.as_bytes())
         print(f"✅ ইমেইল সফলভাবে পাঠানো হয়েছে (Port 465 SSL): {recipient_email}")
         return True, "Port 465 SSL"
     except Exception as e:
         err_465 = str(e)
-        print(f"⚠️ Port 465 ব্যর্থ ({e}), Port 587 STARTTLS দিয়ে চেষ্টা করা হচ্ছে...")
+        print(f"⚠️ Port 465 ব্যর্থ ({e}), Port 587 দিয়ে চেষ্টা করা হচ্ছে...")
 
     # মেথড ২: Port 587 (STARTTLS)
+    err_587 = ""
     try:
-        with smtplib.SMTP('smtp.gmail.com', 587, timeout=25) as server:
+        with smtplib.SMTP('smtp.gmail.com', 587, timeout=20) as server:
             server.ehlo()
             server.starttls()
             server.ehlo()
@@ -319,21 +385,37 @@ def _send_single_email(recipient_email: str, msg: MIMEMultipart) -> tuple[bool, 
     except Exception as e:
         err_587 = str(e)
         print(f"❌ Port 587 ব্যর্থ: {e}")
-        return False, f"Port 465: {err_465} | Port 587: {err_587}"
+
+    # ক্লাউড ফায়ারওয়াল ডিটেকশন
+    if "Network is unreachable" in err_465 or "Network is unreachable" in err_587:
+        err_summary = "Railway সার্ভার আউটবাউন্ড SMTP পোর্ট ব্লক করেছে [Errno 101] (HTTPS রিলে প্রয়োজন)"
+    else:
+        err_summary = f"Port 465: {err_465} | Port 587: {err_587}"
+
+    return False, err_summary
 
 
 def notify_owner_delivery(recipient_email: str, success: bool, method_or_err: str):
     """ইমেইল ডেলিভারির সাথে সাথে Sahadat vai-কে টেলিগ্রামে নোটিফিকেশন দেওয়া"""
+    last_delivery_event["recipient"] = recipient_email
+    last_delivery_event["success"] = success
+    last_delivery_event["detail"] = method_or_err
+    last_delivery_event["time"] = datetime.now().strftime("%I:%M %p")
+
     try:
         status_icon = "✅" if success else "❌"
         title = "লাইভ স্যাম্পল বুলেটিন জিমেইলে পাঠানো হয়েছে!" if success else "ইমেইল পাঠাতে ব্যর্থ হয়েছে!"
         now_str = datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        help_hint = ""
+        if not success and "Railway" in method_or_err:
+            help_hint = "\n💡 <i>রেলওয়ে ক্লাউড আউটবাউন্ড SMTP পোর্ট বন্ধ রাখায় সরাসরি জিমেইলে কানেক্ট হতে পারেনি। HTTPS গুগল স্ক্রিপ্ট বা Resend এপিআই দিলে শতভাগ সক্রিয় হবে।</i>\n"
         text = (
             f"{status_icon} <b>{title}</b>\n"
             "───────────────────────────\n"
             f"📧 <b>প্রাপক:</b> <code>{recipient_email}</code>\n"
             f"⚙️ <b>ডেলিভারি স্ট্যাটাস:</b> {method_or_err}\n"
             f"🕒 <b>সময়:</b> {now_str}\n"
+            f"{help_hint}"
         )
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         requests.post(url, json={
@@ -572,7 +654,7 @@ def send_welcome_email(recipient_email: str) -> bool:
     msg.attach(MIMEText(html_content, 'html', 'utf-8'))
 
     try:
-        success, detail = _send_single_email(recipient_email, msg)
+        success, detail = _send_single_email(recipient_email, msg, msg['Subject'], html_content)
         notify_owner_delivery(recipient_email, success, detail)
         return success
     except Exception as e:
@@ -604,7 +686,7 @@ def send_alert_email() -> bool:
             msg.attach(MIMEText("ঢাকা ট্রাফিক ও আবহাওয়া বুলেটিন দেখতে আপনার ইমেইল ক্লায়েন্টের HTML ভিউ সক্রিয় করুন।", 'plain', 'utf-8'))
             msg.attach(MIMEText(html, 'html', 'utf-8'))
 
-            ok, _ = _send_single_email(email, msg)
+            ok, _ = _send_single_email(email, msg, subject, html)
             if ok:
                 success_count += 1
         except Exception as sub_err:

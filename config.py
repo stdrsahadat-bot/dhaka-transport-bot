@@ -25,3 +25,7 @@ ALERT_TIMES = ["07:00", "12:00", "18:00"]
 
 # 👑 ক্রিয়েটর ও অ্যাডমিনের ভেরিফাইড টেলিগ্রাম আইডি
 OWNER_TELEGRAM_ID = int(os.environ.get("OWNER_TELEGRAM_ID", "7042555228"))
+
+# 🌐 ক্লাউড সার্ভার (Railway) থেকে সরাসরি ইমেইল পাঠানোর HTTPS রিলে
+GOOGLE_SCRIPT_URL   = os.environ.get("GOOGLE_SCRIPT_URL", "").strip()
+RESEND_API_KEY      = os.environ.get("RESEND_API_KEY", "").strip()
