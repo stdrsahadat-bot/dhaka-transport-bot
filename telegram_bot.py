@@ -16,6 +16,8 @@ from email_sender import add_subscriber, remove_subscriber, load_subscribers
 
 import os
 import json
+import re
+import html
 from datetime import datetime
 
 USERS_FILE = os.path.join(os.path.dirname(__file__), "bot_users.json")
@@ -72,7 +74,8 @@ def track_user(user):
 def get_start_button():
     """কথোপকথন শেষে বা শুরুতে ফ্রেশ স্টার্ট বাটন"""
     keyboard = [
-        [InlineKeyboardButton("🚀 নতুন যাত্রা শুরু করুন (/start)", callback_data="btn_restart")]
+        [InlineKeyboardButton("🚀 নতুন যাত্রা শুরু করুন (/start)", callback_data="btn_restart")],
+        [InlineKeyboardButton("📧 ইমেইল বুলেটিন সাবস্ক্রাইব", callback_data="btn_subscribe")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
@@ -85,8 +88,11 @@ def get_active_buttons():
             InlineKeyboardButton("🌡️ আবহাওয়া সতর্কতা", callback_data="btn_weather"),
         ],
         [
-            InlineKeyboardButton("✅ আমার কাজ শেষ / ধন্যবাদ", callback_data="btn_finish"),
+            InlineKeyboardButton("📧 ইমেইল বুলেটিন সাবস্ক্রাইব", callback_data="btn_subscribe"),
             InlineKeyboardButton("🔄 নতুন করে শুরু", callback_data="btn_restart"),
+        ],
+        [
+            InlineKeyboardButton("✅ আমার কাজ শেষ / ধন্যবাদ", callback_data="btn_finish"),
         ]
     ]
     return InlineKeyboardMarkup(keyboard)
@@ -99,19 +105,24 @@ async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     args = ctx.args
 
     if not args:
+        ctx.user_data["awaiting_email"] = True
         msg = (
-            "📧 **ঢাকা ট্রাফিক ও আবহাওয়া দৈনিক ইমেইল সার্ভিস**\n"
+            "📧 <b>ঢাকা ট্রাফিক ও আবহাওয়া দৈনিক ইমেইল বুলেটিন</b>\n"
             "───────────────────────────\n"
-            "প্রতিদিন **সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়** জিমেইলে ঢাকার রঙিন ট্রাফিক ও আবহাওয়া বুলেটিন পেতে লিখুন:\n\n"
-            "👉 `/subscribe আপনার_ইমেইল`\n\n"
-            "📌 *উদাহরণ:* `/subscribe rahim@gmail.com`\n\n"
-            "বট স্বয়ংক্রিয়ভাবে আপনার ইনবক্সে লাইভ অ্যালার্ট পাঠানো শুরু করবে!"
+            "প্রতিদিন <b>সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়</b> জিমেইলে ঢাকার রঙিন ট্রাফিক ও আবহাওয়া বুলেটিন পেতে:\n\n"
+            "👉 <b>আপনার ইমেইল বা জিমেইল ঠিকানাটি সরাসরি নিচে লিখে মেসেজ দিন।</b>\n\n"
+            "📌 <i>যেমন: rahim@gmail.com</i>\n\n"
+            "💡 <i>(বাতিল করতে চাইলে /start লিখুন)</i>"
         )
-        await update.message.reply_text(msg)
+        if update.message:
+            await update.message.reply_text(msg, parse_mode="HTML")
+        elif update.callback_query:
+            await update.callback_query.message.reply_text(msg, parse_mode="HTML")
         return
 
     email = args[0].strip()
     success, reply_msg = add_subscriber(email, user_id)
+    ctx.user_data["awaiting_email"] = False
     await update.message.reply_text(reply_msg)
 
 
@@ -119,63 +130,69 @@ async def cmd_subscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_unsubscribe(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     track_user(update.effective_user)
     user_id = update.effective_user.id
+    ctx.user_data["awaiting_email"] = False
     success, reply_msg = remove_subscriber(user_id)
     await update.message.reply_text(reply_msg)
 
 
 # ─────────────────────────── /admin ───────────────────────────
 async def cmd_admin(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     user_id = update.effective_user.id
     if user_id != OWNER_TELEGRAM_ID:
         await update.message.reply_text(
-            "⛔ **অ্যাক্সেস অস্বীকৃত!**\n\nএই বিশেষ অ্যাডমিন প্যানেলটি শুধুমাত্র বটের অফিসিয়াল প্রতিষ্ঠাতা ও ক্রিয়েটর Md Sahadat Hossain (Sahadat vai)-এর জন্য সংরক্ষিত।"
+            "⛔ <b>অ্যাক্সেস অস্বীকৃত!</b>\n\nএই বিশেষ অ্যাডমিন প্যানেলটি শুধুমাত্র বটের অফিসিয়াল প্রতিষ্ঠাতা ও ক্রিয়েটর Md Sahadat Hossain (Sahadat vai)-এর জন্য সংরক্ষিত।",
+            parse_mode="HTML"
         )
         return
 
     knowledge = load_knowledge_base()
     learned_preview = ""
     if knowledge:
-        learned_preview = "\n".join([f"• {k['info']} ({k['learned_at']})" for k in knowledge[-5:]])
+        learned_preview = "\n".join([f"• {html.escape(k.get('info', ''))} ({k.get('learned_at', '')})" for k in knowledge[-5:]])
     else:
         learned_preview = "• এখনো কোনো নতুন তথ্য জমা হয়নি।"
 
     subscribers = load_subscribers()
     sub_preview = ""
     if subscribers:
-        sub_preview = "\n".join([f"  - {s['email']} ({s.get('subscribed_at', '')})" for s in subscribers[-5:]])
+        sub_preview = "\n".join([f"  - {html.escape(s.get('email', ''))} ({s.get('subscribed_at', '')})" for s in subscribers[-5:]])
     else:
         sub_preview = "  - কোনো সাবস্ক্রাইবার এখনো নেই।"
 
     users = load_users()
     recent_users_text = ""
     for u in list(users.values())[-5:]:
-        recent_users_text += f"  - {u['name']} ({u['username']}) | 🆔 `{u['id']}`\n"
+        name_clean = html.escape(str(u.get('name', 'নামহীন')))
+        uname_clean = html.escape(str(u.get('username', 'নেই')))
+        recent_users_text += f"  - {name_clean} ({uname_clean}) | 🆔 <code>{u.get('id', '')}</code>\n"
 
     admin_text = (
-        "👑 **অ্যাডমিন কন্ট্রোল সেন্টার | Dhaka Guide**\n"
+        "👑 <b>অ্যাডমিন কন্ট্রোল সেন্টার | Dhaka Guide</b>\n"
         "───────────────────────────\n"
-        f"• 👤 ক্রিয়েটর: **Md Sahadat Hossain**\n"
-        f"• 🆔 টেলিগ্রাম আইডি: `{OWNER_TELEGRAM_ID}` (Verified ✅)\n"
-        f"• 👥 **মোট টেলিগ্রাম ইউজার:** **{len(users)}** জন\n"
-        f"• 📬 দৈনিক ইমেইল সাবস্ক্রাইবার: **{len(subscribers)}** জন\n"
-        f"• 🧠 মানুষের থেকে শেখা তথ্য: **{len(knowledge)}** টি\n"
-        f"• 💬 সক্রিয় ব্যবহারকারী সেশন: **{len(active_sessions)}** টি\n"
+        f"• 👤 ক্রিয়েটর: <b>Md Sahadat Hossain</b>\n"
+        f"• 🆔 টেলিগ্রাম আইডি: <code>{OWNER_TELEGRAM_ID}</code> (Verified ✅)\n"
+        f"• 👥 <b>মোট টেলিগ্রাম ইউজার:</b> <b>{len(users)}</b> জন\n"
+        f"• 📬 দৈনিক ইমেইল সাবস্ক্রাইবার: <b>{len(subscribers)}</b> জন\n"
+        f"• 🧠 মানুষের থেকে শেখা তথ্য: <b>{len(knowledge)}</b> টি\n"
+        f"• 💬 সক্রিয় ব্যবহারকারী সেশন: <b>{len(active_sessions)}</b> টি\n"
         "• 🧹 মেমোরি ক্লিনআপ: ৪৮ ঘণ্টা পর পর অটো-ক্লিন সক্রিয়\n"
         "• ☁️ ক্লাউড সার্ভার: Railway 24/7 Worker\n\n"
-        f"👥 **সাম্প্রতিক টেলিগ্রাম ইউজারগণ:**\n{recent_users_text or '  - এখনো কোনো রেকর্ড নেই।'}\n"
-        f"📬 **সাম্প্রতিক ইমেইল সাবস্ক্রাইবারগণ:**\n{sub_preview}\n\n"
-        f"📚 **সাম্প্রতিক শেখা তথ্যের নমুনা:**\n{learned_preview}\n"
+        f"👥 <b>সাম্প্রতিক টেলিগ্রাম ইউজারগণ:</b>\n{recent_users_text or '  - এখনো কোনো রেকর্ড নেই।'}\n"
+        f"📬 <b>সাম্প্রতিক ইমেইল সাবস্ক্রাইবারগণ:</b>\n{sub_preview}\n\n"
+        f"📚 <b>সাম্প্রতিক শেখা তথ্যের নমুনা:</b>\n{learned_preview}\n"
         "───────────────────────────\n"
-        "💡 সব ইউজারের পুরো ডিটেইলস দেখতে লিখুন: `/users`"
+        "💡 সব ইউজারের পুরো ডিটেইলস দেখতে লিখুন: <code>/users</code>"
     )
-    await update.message.reply_text(admin_text)
+    await update.message.reply_text(admin_text, parse_mode="HTML")
 
 
 # ─────────────────────────── /users ───────────────────────────
 async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    track_user(update.effective_user)
     user_id = update.effective_user.id
     if user_id != OWNER_TELEGRAM_ID:
-        await update.message.reply_text("⛔ অ্যাক্সেস অস্বীকৃত!")
+        await update.message.reply_text("⛔ <b>অ্যাক্সেস অস্বীকৃত!</b>", parse_mode="HTML")
         return
 
     users = load_users()
@@ -183,11 +200,13 @@ async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("ℹ️ এখনো কোনো ব্যবহারকারীর রেকর্ড নেই।")
         return
 
-    lines = [f"👥 **বট ব্যবহারকারীদের পূর্ণাঙ্গ তালিকা (মোট: {len(users)} জন):**\n"]
+    lines = [f"👥 <b>বট ব্যবহারকারীদের পূর্ণাঙ্গ তালিকা (মোট: {len(users)} জন):</b>\n"]
     for i, u in enumerate(users.values(), 1):
+        name_clean = html.escape(str(u.get('name', 'নামহীন')))
+        uname_clean = html.escape(str(u.get('username', 'নেই')))
         lines.append(
-            f"{i}. **{u['name']}** ({u['username']})\n"
-            f"   🆔 ID: `{u['id']}` | 💬 মেসেজ: {u.get('msg_count', 1)} বার\n"
+            f"{i}. <b>{name_clean}</b> ({uname_clean})\n"
+            f"   🆔 ID: <code>{u.get('id', '')}</code> | 💬 মেসেজ: {u.get('msg_count', 1)} বার\n"
             f"   🕒 প্রথম আগমন: {u.get('first_seen', 'N/A')}\n"
             f"   🕒 শেষ সক্রিয়: {u.get('last_seen', 'N/A')}\n"
         )
@@ -195,9 +214,9 @@ async def cmd_users(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     msg = "\n".join(lines)
     if len(msg) > 4000:
         for chunk in [msg[i:i+4000] for i in range(0, len(msg), 4000)]:
-            await update.message.reply_text(chunk)
+            await update.message.reply_text(chunk, parse_mode="HTML")
     else:
-        await update.message.reply_text(msg)
+        await update.message.reply_text(msg, parse_mode="HTML")
 
 
 # ─────────────────────────── /start ───────────────────────────
@@ -262,6 +281,19 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text(finish_text, reply_markup=get_start_button(), parse_mode="Markdown")
         return
 
+    if data == "btn_subscribe":
+        ctx.user_data["awaiting_email"] = True
+        msg = (
+            "📧 <b>ঢাকা ট্রাফিক ও আবহাওয়া দৈনিক ইমেইল বুলেটিন</b>\n"
+            "───────────────────────────\n"
+            "প্রতিদিন <b>সকাল ০৭:০০, দুপুর ১২:০০ এবং সন্ধ্যা ০৬:০০ টায়</b> জিমেইলে ঢাকার রঙিন ট্রাফিক ও আবহাওয়া বুলেটিন পেতে:\n\n"
+            "👉 <b>আপনার ইমেইল বা জিমেইল ঠিকানাটি সরাসরি নিচে লিখে মেসেজ দিন।</b>\n\n"
+            "📌 <i>যেমন: rahim@gmail.com</i>\n\n"
+            "💡 <i>(বাতিল করতে চাইলে /start লিখুন)</i>"
+        )
+        await query.message.reply_text(msg, parse_mode="HTML")
+        return
+
     await query.message.chat.send_action(action="typing")
 
     prompt_map = {
@@ -279,9 +311,22 @@ async def handle_callback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 # ─────────────────── টেক্সট মেসেজ হ্যান্ডলার ───────────────────
 async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     track_user(update.effective_user)
-    text = update.message.text or ""
+    text = (update.message.text or "").strip()
     user_id = update.effective_user.id
     
+    # ১. ইউজার যদি ইমেইল দিয়ে সাবস্ক্রাইব করতে চায় (বা /subscribe চাপার পর অথবা মেসেজে সরাসরি ইমেইল লিখলে)
+    email_match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
+    if ctx.user_data.get("awaiting_email") or (email_match and len(text) < 120 and ("@" in text)):
+        if email_match:
+            email = email_match.group(0).strip()
+            success, reply_msg = add_subscriber(email, user_id)
+            ctx.user_data["awaiting_email"] = False
+            await update.message.reply_text(reply_msg)
+            return
+        elif ctx.user_data.get("awaiting_email"):
+            await update.message.reply_text("⚠️ অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস লিখুন (যেমন: name@gmail.com) অথবা বাতিল করতে /start লিখুন।")
+            return
+
     await update.message.chat.send_action(action="typing")
     res = get_ai_response(user_id, text)
     
