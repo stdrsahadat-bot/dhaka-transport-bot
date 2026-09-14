@@ -338,19 +338,19 @@ async def post_init(application: Application):
     """মেনুবারে পারসোনালাইজড বাটন সেট করা"""
     # ১. সাধারণ পাবলিক ইউজারদের মেনু (এখানে অ্যাডমিন সম্পূর্ণ গোপন থাকবে)
     public_commands = [
-        BotCommand("start", "🚀 শুরু করুন / লাইভ আপডেট"),
-        BotCommand("subscribe", "📧 দৈনিক ইমেইল অ্যালার্ট"),
-        BotCommand("unsubscribe", "❌ ইমেইল অ্যালার্ট বন্ধ"),
+        BotCommand("start", "🚀 Start / Live Update"),
+        BotCommand("subscribe", "📧 Subscribe Email"),
+        BotCommand("unsubscribe", "❌ Unsubscribe"),
     ]
     await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
 
     # ২. শুধুমাত্র আসল ক্রিয়েটর Sahadat vai-এর চ্যাটে সিক্রেট অ্যাডমিন শর্টকাট দেখাবে
     owner_commands = [
-        BotCommand("start", "🚀 শুরু করুন / লাইভ আপডেট"),
-        BotCommand("subscribe", "📧 দৈনিক ইমেইল অ্যালার্ট"),
-        BotCommand("unsubscribe", "❌ ইমেইল অ্যালার্ট বন্ধ"),
-        BotCommand("admin", "👑 অ্যাডমিন কন্ট্রোল প্যানেল"),
-        BotCommand("users", "👥 ব্যবহারকারী তালিকা ও আইডি"),
+        BotCommand("start", "🚀 Start / Live Update"),
+        BotCommand("subscribe", "📧 Subscribe Email"),
+        BotCommand("unsubscribe", "❌ Unsubscribe"),
+        BotCommand("admin", "👑 Admin Panel"),
+        BotCommand("users", "👥 Users List"),
     ]
     try:
         await application.bot.set_my_commands(
