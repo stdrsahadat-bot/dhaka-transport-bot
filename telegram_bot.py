@@ -1,6 +1,6 @@
 from telegram import (
     Update, InlineKeyboardButton, InlineKeyboardMarkup,
-    BotCommand,
+    BotCommand, BotCommandScopeDefault, BotCommandScopeChat,
 )
 from telegram.ext import (
     Application, CommandHandler, MessageHandler,
@@ -156,12 +156,25 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def post_init(application: Application):
-    """মেনুবারে স্থায়ী বাটন সেট করা"""
-    commands = [
+    """মেনুবারে পারসোনালাইজড বাটন সেট করা"""
+    # ১. সাধারণ পাবলিক ইউজারদের মেনু (এখানে অ্যাডমিন সম্পূর্ণ গোপন থাকবে)
+    public_commands = [
         BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
-        BotCommand("admin", "অ্যাডমিন প্যানেল (Sahadat vai)"),
     ]
-    await application.bot.set_my_commands(commands)
+    await application.bot.set_my_commands(public_commands, scope=BotCommandScopeDefault())
+
+    # ২. শুধুমাত্র আসল ক্রিয়েটর Sahadat vai-এর চ্যাটে সিক্রেট অ্যাডমিন শর্টকাট দেখাবে
+    owner_commands = [
+        BotCommand("start", "শুরু করুন / বর্তমান ঢাকা আপডেট"),
+        BotCommand("admin", "👑 অ্যাডমিন কন্ট্রোল প্যানেল"),
+    ]
+    try:
+        await application.bot.set_my_commands(
+            owner_commands,
+            scope=BotCommandScopeChat(chat_id=OWNER_TELEGRAM_ID)
+        )
+    except Exception as e:
+        print(f"Owner scoped commands notice: {e}")
 
 
 # ──────────────────────── রান বট ────────────────────────────
