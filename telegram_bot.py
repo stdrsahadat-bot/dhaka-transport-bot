@@ -317,6 +317,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     track_user(update.effective_user)
     user_id = update.effective_user.id
     clear_history(user_id)
+    ctx.user_data["awaiting_email"] = False
 
     # বর্তমান আবহাওয়া ও ট্রাফিক লাইভ ডাটা
     jam = get_jam_status()
@@ -408,19 +409,28 @@ async def handle_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
     user_id = update.effective_user.id
     
-    # ১. ইউজার যদি ইমেইল দিয়ে সাবস্ক্রাইব করতে চায় (বা /subscribe চাপার পর অথবা মেসেজে সরাসরি ইমেইল লিখলে)
+    # ১. ইউজার যদি ইমেইল দিয়ে সাবস্ক্রাইব করতে চায়
     email_match = re.search(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+", text)
-    if ctx.user_data.get("awaiting_email") or (email_match and len(text) < 120 and ("@" in text)):
-        if email_match:
-            email = email_match.group(0).strip()
-            success, reply_msg = add_subscriber(email, user_id)
+    if email_match:
+        email = email_match.group(0).strip()
+        success, reply_msg = add_subscriber(email, user_id)
+        ctx.user_data["awaiting_email"] = False
+        await update.message.reply_text(reply_msg)
+        if success:
+            await notify_owner_new_subscriber(ctx.bot, update.effective_user, email)
+        return
+    elif ctx.user_data.get("awaiting_email"):
+        # ইউজার যদি ইমেইল না দিয়ে যাতায়াত/বাসের রুট বা সাধারণ প্রশ্ন জিজ্ঞেস করে
+        travel_keywords = ["theke", "jabo", "zabo", "koto", "vara", "bhara", "bus", "বাস", "থেকে", "যাব", "যাবো", "ভাড়া", "মেট্রো", "কেমনে", "যায়", "jay"]
+        if any(k in text.lower() for k in travel_keywords) or len(text.split()) > 4:
+            # মোড রিসেট করে সরাসরি এআই প্রশ্নের উত্তর দেবে
             ctx.user_data["awaiting_email"] = False
-            await update.message.reply_text(reply_msg)
-            if success:
-                await notify_owner_new_subscriber(ctx.bot, update.effective_user, email)
-            return
-        elif ctx.user_data.get("awaiting_email"):
-            await update.message.reply_text("⚠️ অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস লিখুন (যেমন: name@gmail.com) অথবা বাতিল করতে /start লিখুন।")
+        else:
+            await update.message.reply_text(
+                "⚠️ অনুগ্রহ করে একটি সঠিক ইমেইল এড্রেস লিখুন (যেমন: name@gmail.com)\n"
+                "💡 আপনি যদি যাতায়াত সংক্রান্ত তথ্য জানতে চান, তবে সরাসরি কোথা থেকে কোথায় যাবেন লিখে মেসেজ দিন।",
+                reply_markup=get_active_buttons()
+            )
             return
 
     # ২. ইউজার যদি জিমেইল/ইমেইল না পাওয়ার অভিযোগ বা প্রশ্ন করে (যেমন: "amar gmaile to kono massage ashe ni")
